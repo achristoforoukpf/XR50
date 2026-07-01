@@ -11,9 +11,9 @@
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   /* background MUST stay transparent — on iOS (Variant Launch) the camera renders BEHIND the page,
      so any opaque body background hides the passthrough. The gate has its own full-screen bg. */
-  html,body { width:100%; height:100%; overflow:hidden; background:transparent; font-family:"Helvetica Neue",Helvetica,Arial,Roboto,sans-serif; color:#fff; -webkit-font-smoothing:antialiased; }
-  /* KPF brand palette */
-  :root { --kpf-navy:#21384a; --kpf-meta:#8b949c; --kpf-body:#55606b; --kpf-rule:#e3e6e9; }
+  html,body { width:100%; height:100%; overflow:hidden; background:transparent; font-family:"Suisse Neue","Helvetica Neue",Helvetica,Arial,Roboto,sans-serif; color:#fff; -webkit-font-smoothing:antialiased; }
+  /* KPF brand palette (from KPF-designguide-250602.pdf) */
+  :root { --kpf-navy:#0A1E42; --kpf-paper:#F6F2E9; --kpf-meta:#A4A6A7; --kpf-body:#4b5560; --kpf-rule:#e3ded2; }
 
   #version { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:0; right:0; text-align:center; font-size:13px; font-weight:700; letter-spacing:.5px; color:#4da3ff; z-index:30; }
 
@@ -33,7 +33,10 @@
 
   /* DOM overlay (drawn over the AR camera feed) */
   #overlay { position:fixed; inset:0; z-index:10; display:none; }
-  .arrow { position:fixed; z-index:11; transform:translate(-50%,-50%); background:rgba(0,0,0,0.82); border:1px solid rgba(255,255,255,0.5); color:#fff; font-size:12px; font-weight:700; padding:5px 9px; border-radius:14px; white-space:nowrap; pointer-events:none; display:none; box-shadow:0 2px 8px rgba(0,0,0,.4); }
+  .arrow { position:fixed; z-index:11; transform:translate(-50%,-50%); background:rgba(10,30,66,0.82); border:1px solid rgba(255,255,255,0.5); color:#fff; font-size:12px; font-weight:600; padding:5px 9px; border-radius:14px; white-space:nowrap; pointer-events:none; display:none; box-shadow:0 2px 8px rgba(0,0,0,.4); }
+  /* Welded labels are DOM (crisp on all devices — the 3D canvas texture was blurred by iOS's reduced-res WebGL layer) */
+  .arlabel { position:fixed; z-index:11; transform:translate(-50%,-50%); background:rgba(10,30,66,0.86); border:1px solid rgba(255,255,255,0.55); color:#fff; font-size:14px; font-weight:600; letter-spacing:.005em; padding:7px 13px; border-radius:20px; white-space:nowrap; pointer-events:auto; display:none; box-shadow:0 2px 10px rgba(0,0,0,.45); }
+  .arlabel::after { content:" ⓘ"; opacity:.7; font-weight:400; }
   #crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
   #crosshair::before, #crosshair::after { content:""; position:absolute; background:rgba(255,255,255,0.9); }
   #crosshair::before { width:2px; height:26px; left:-1px; top:-13px; }
@@ -48,7 +51,7 @@
   #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
   /* Info card — KPF brand styling: white, navy headings, wide-tracked uppercase meta labels */
-  #infoCard { position:fixed; left:0; right:0; bottom:0; z-index:12; background:#fff; border-radius:14px 14px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .25s ease; box-shadow:0 -8px 30px rgba(0,0,0,.35); }
+  #infoCard { position:fixed; left:0; right:0; bottom:0; z-index:12; background:var(--kpf-paper); border-radius:14px 14px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .25s ease; box-shadow:0 -8px 30px rgba(0,0,0,.35); }
   #infoCard.open { transform:translateY(0); }
   #infoCard .close { position:absolute; top:12px; right:16px; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; }
   #infoCard h2 { color:var(--kpf-navy); font-size:24px; font-weight:700; letter-spacing:-.01em; margin-bottom:16px; padding-right:30px; }
@@ -61,7 +64,7 @@
 </head>
 <body>
 
-<div id="version">v2.5 · KPF typography</div>
+<div id="version">v2.6 · sharp DOM labels + KPF palette</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -186,34 +189,6 @@ const camUp = new THREE.Vector3();
 let ignoreSelectUntil = 0;
 let aligned = false;
 let dirSign = 1;                   // flip if left/right ends up mirrored on this device
-const PLACE_DIST = 40;             // meters: how far out billboards sit (readable, low walk-parallax)
-
-// ---- Label sprite (billboarded canvas text) ----
-// SS supersamples the canvas so text stays crisp on high-DPR phones (iPhone was pixelated at SS=1).
-function makeLabel(text) {
-  const SS = 4;
-  const pad = 24*SS, fs = 44*SS, r = 24*SS;
-  const c = document.createElement('canvas'), g = c.getContext('2d');
-  g.font = `700 ${fs}px -apple-system, Roboto, sans-serif`;
-  const w = g.measureText(text).width + pad*2;
-  c.width = Math.ceil(w); c.height = fs + pad*2;
-  g.font = `700 ${fs}px -apple-system, Roboto, sans-serif`;
-  g.fillStyle = 'rgba(0,0,0,0.85)';
-  g.beginPath();
-  g.moveTo(r,0); g.arcTo(c.width,0,c.width,c.height,r); g.arcTo(c.width,c.height,0,c.height,r);
-  g.arcTo(0,c.height,0,0,r); g.arcTo(0,0,c.width,0,r); g.closePath(); g.fill();
-  g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 3*SS; g.stroke();
-  g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.textAlign = 'center';
-  g.fillText(text, c.width/2, c.height/2);
-  const tex = new THREE.CanvasTexture(c);
-  tex.anisotropy = (renderer && renderer.capabilities) ? renderer.capabilities.getMaxAnisotropy() : 8;
-  const mat = new THREE.SpriteMaterial({ map:tex, depthTest:false, transparent:true });
-  const sp = new THREE.Sprite(mat);
-  const scaleM = 6;                        // label ~6m wide at placement distance
-  sp.scale.set(scaleM, scaleM * c.height/c.width, 1);
-  sp.renderOrder = 999;
-  return sp;
-}
 
 // Build a session-space direction from a yaw (rad, clockwise from the align forward) + elevation.
 function dirFromYaw(yaw, elevRad) {
@@ -229,16 +204,10 @@ function dirFromYaw(yaw, elevRad) {
 function alignOn(ref) {
   if (camForward.lengthSq() === 0) { setStatus('Tracking not ready — move the phone a moment.'); return; }
   const refYaw = Math.atan2(camForward.x, -camForward.z);   // session yaw the user is aiming at
-  const anchorPos = camPos.clone();
 
   for (const b of BUILDINGS) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
     b.dir = dirFromYaw(refYaw + dTheta, 0).normalize();                   // fixed DIRECTION (behaves like infinity)
-    if (b.sprite) scene.remove(b.sprite);
-    const sprite = makeLabel(b.name);
-    sprite.position.copy(anchorPos).addScaledVector(b.dir, PLACE_DIST);
-    scene.add(sprite);
-    b.sprite = sprite;
   }
   aligned = true;
   setStatus(`Aligned on ${ref.name}. Pan around — all labels are placed and welded. Tap one for info.`);
@@ -420,26 +389,34 @@ function render() {
     const W = innerWidth, H = innerHeight, cx = W/2, cy = H/2, mx = cx - 48, my = cy - 72;
 
     for (const b of BUILDINGS) {
-      if (!b.sprite || !b.dir) continue;
-      // Direction-locked: hold a fixed bearing from the current camera pos (no parallax jitter).
-      b.sprite.position.copy(camPos).addScaledVector(b.dir, PLACE_DIST);
+      if (!b.dir) continue;
+      // Lazily create the DOM label + edge arrow for this building.
+      if (!b.labelEl) {
+        b.labelEl = document.createElement('div'); b.labelEl.className = 'arlabel'; b.labelEl.textContent = b.name;
+        b.labelEl.addEventListener('pointerdown', () => { ignoreSelectUntil = performance.now() + 500; });
+        b.labelEl.addEventListener('click', (e) => { e.stopPropagation(); showInfo(b); });
+        $('#overlay').appendChild(b.labelEl);
+      }
+      if (!b.arrowEl) { b.arrowEl = document.createElement('div'); b.arrowEl.className = 'arrow'; $('#overlay').appendChild(b.arrowEl); }
 
       // Opacity: dim far buildings, brighten the one you're aiming toward ("approach" = look at it).
       const distOp = clamp(1 - (b.dist - 200) / (1500 - 200), 0.25, 1);
-      const dot = b.dir.dot(camForward);
-      const focus = clamp((dot - Math.cos(20*Math.PI/180)) / (Math.cos(6*Math.PI/180) - Math.cos(20*Math.PI/180)), 0, 1);
-      b.sprite.material.opacity = distOp + (1 - distOp) * focus;
+      const fwd = b.dir.dot(camForward), right = b.dir.dot(camRight), up = b.dir.dot(camUp);
+      const focus = clamp((fwd - Math.cos(20*Math.PI/180)) / (Math.cos(6*Math.PI/180) - Math.cos(20*Math.PI/180)), 0, 1);
+      const op = distOp + (1 - distOp) * focus;
 
       // On-screen test (approx, from view-space projection).
-      const fwd = b.dir.dot(camForward), right = b.dir.dot(camRight), up = b.dir.dot(camUp);
       const ndcX = fwd > 0 ? (right/fwd)/tanH : 99, ndcY = fwd > 0 ? (up/fwd)/tanV : 99;
       const onScreen = fwd > 0 && Math.abs(ndcX) <= 1 && Math.abs(ndcY) <= 1;
 
-      b.sprite.visible = onScreen;
-      if (!b.arrowEl) { b.arrowEl = document.createElement('div'); b.arrowEl.className = 'arrow'; $('#overlay').appendChild(b.arrowEl); }
       if (onScreen) {
         b.arrowEl.style.display = 'none';
+        b.labelEl.style.display = 'block';
+        b.labelEl.style.left = (cx + ndcX * cx) + 'px';
+        b.labelEl.style.top  = (cy - ndcY * cy) + 'px';
+        b.labelEl.style.opacity = op.toFixed(3);
       } else {
+        b.labelEl.style.display = 'none';
         // Point an edge indicator toward the off-screen label.
         let dx = fwd > 0.02 ? ndcX : right, dy = fwd > 0.02 ? ndcY : up;
         let sdx = dx, sdy = -dy;                       // screen y is down
