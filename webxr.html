@@ -55,7 +55,7 @@
 </head>
 <body>
 
-<div id="version">v2.1 · persistent error</div>
+<div id="version">v2.2 · iOS session fix</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -351,6 +351,7 @@ async function enterAR() {
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
 
     xrSession = await navigator.xr.requestSession('immersive-ar', {
+      requiredFeatures: ['local'],              // Variant Launch's polyfill reads this array; omitting it crashes on iOS
       optionalFeatures: ['dom-overlay'],
       domOverlay: { root: $('#overlay') },
     });
