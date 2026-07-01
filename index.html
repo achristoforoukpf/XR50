@@ -92,8 +92,9 @@
 
 <div id="bottom">
   <div id="calib">
-    <div class="hint">Aim the crosshair exactly at a known building below, then tap it to correct compass drift:</div>
+    <div class="hint" id="calibHint">Aim the crosshair at a known building and tap it. Tap two different buildings for the best fix.</div>
     <div class="row" id="calibBtns"></div>
+    <div class="row"><button id="calibReset">Reset calibration</button></div>
   </div>
   <div id="tune">
     <div class="row"><span class="label">FOV</span><input type="range" id="fov" min="35" max="90" value="62" step="1"><span id="fovVal">62°</span></div>
@@ -170,8 +171,8 @@
   $('#infoBackdrop').addEventListener('click', hideInfo);
 
   // ---- Known buildings (from Google Maps pin drops) ----
-  // Same coordinates/engine as photo.html. Camera = 11 West 42nd St, ~6th floor (estimated).
-  const OFFICE = { lat: 40.7534, lon: -73.9828 };
+  // Same coordinates/engine as photo.html. Camera = 11 West 42nd St window (exact pin drop).
+  const OFFICE = { lat: 40.754157, lon: -73.981942 };
   const BUILDINGS = [
     { name: "Building 1", lat: 40.752282, lon: -73.982214 },
     { name: "Building 2", lat: 40.753454, lon: -73.985334 },
@@ -191,18 +192,26 @@
 
   // ---- State ----
   let rawHeading = null, rawPitch = null;    // raw sensor values (degrees), noisy
-  let curHeading = null, curPitch = null;    // filtered — this is what drives rendering
+  let filteredSensor = null;                 // low-pass of raw compass, calibration-INDEPENDENT
+  let curHeading = null, curPitch = null;    // curHeading = calibrated(filteredSensor) — drives rendering
   let haveHeading = false;
   let fov = 62;                              // horizontal field of view (deg) — tune to match camera
   let smoothAlpha = 0.18;                    // base filter strength — spike rejection below lets this be more responsive
   let pitchTrim = 0;                         // manual vertical nudge for preloaded pins (deg) — no height data yet
-  let calibrationOffset = 0;                 // deg added to every raw sensor reading, set by tapping a known building below
-  let lastSensorHeading = null;              // most recent UNCALIBRATED reading, used to compute a new offset on calibration
+
+  // Calibration model maps the noisy sensor heading to a corrected heading:
+  //   curHeading = calRefBearing + calScale * angleDiff(filteredSensor, calRefSensor)
+  // Defaults are the identity (raw compass). One tap sets an offset (scale 1);
+  // a second tap on a different building also solves the scale, correcting the spread.
+  let calRefSensor = 0, calRefBearing = 0, calScale = 1;
+  let calPoint1 = null;                      // { sensor, bearing, name } — first of two calibration taps
+
   const pins = [];                           // { id, label, heading, pitch, sx, sy } sx/sy = smoothed screen pos
   let pinCount = 0;
 
   function showErr(msg) { errBox.textContent = msg; errBox.style.display = 'block'; }
   function angleDiff(a, b) { let d = (a - b + 540) % 360 - 180; return d; }
+  function applyCalibration(sensor) { return calRefBearing + calScale * angleDiff(sensor, calRefSensor); }
 
   // ---- Heading/pitch from device orientation ----
   // Normalize to a CLOCKWISE-increasing heading so left/right panning is consistent
@@ -224,13 +233,12 @@
       sensorH = (360 - e.alpha) % 360;             // Android: convert CCW alpha -> CW heading
     }
     if (sensorH !== null) {
-      lastSensorHeading = sensorH;
-      const h = (sensorH + calibrationOffset + 360) % 360;   // apply manual calibration against a known building
-      rawHeading = h; haveHeading = true;
-      if (curHeading === null) {
-        curHeading = h;
+      rawHeading = sensorH; haveHeading = true;
+      // Filter the RAW sensor (calibration-independent) so calibration taps stay valid across pans.
+      if (filteredSensor === null) {
+        filteredSensor = sensorH;
       } else {
-        let diff = angleDiff(h, curHeading);
+        let diff = angleDiff(sensorH, filteredSensor);
         // Reject sudden large jumps (typically magnetic interference from steel framing) —
         // unless they persist for a couple samples in a row, in which case treat it as real motion.
         if (Math.abs(diff) > 25) {
@@ -240,8 +248,9 @@
           headingSpikeStreak = 0;
           if (Math.abs(diff) < 0.4) diff = 0;       // deadband: ignore sub-degree sensor noise
         }
-        curHeading += diff * smoothAlpha;
+        filteredSensor += diff * smoothAlpha;
       }
+      curHeading = applyCalibration(filteredSensor);
     }
     if (typeof e.beta === 'number' && e.beta !== null) {
       rawPitch = e.beta - 90;                      // ~0 at horizon when held upright, + looking up
@@ -264,7 +273,8 @@
   // ---- Render loop with screen-space smoothing ----
   const SMOOTH = 0.5; // heading is already filtered upstream; this just irons out sub-pixel rounding
   function render() {
-    readout.innerHTML = (haveHeading ? `heading ${curHeading.toFixed(0)}° <span style="opacity:.6">(raw ${rawHeading.toFixed(0)}°)</span>` : 'heading —° (no compass)')
+    const disp = haveHeading ? ((curHeading % 360 + 360) % 360).toFixed(0) : '—';
+    readout.innerHTML = (haveHeading ? `heading ${disp}° <span style="opacity:.6">(raw ${rawHeading.toFixed(0)}°, ${calScale.toFixed(2)}×)</span>` : 'heading —° (no compass)')
                       + `<br>pitch ${curPitch===null?'—':curPitch.toFixed(0)}°`;
 
     for (const pin of pins) {
@@ -339,8 +349,18 @@
     }
   }
 
-  // ---- Calibration: tap a known building while the crosshair is exactly on it,
-  // and the current sensor reading is pinned to that building's real (computed) bearing.
+  // ---- Calibration ----
+  // Aim the crosshair at a known building and tap it. The FIRST tap sets an offset
+  // (slides all pins so that building is centered). Tapping a SECOND, different building
+  // also solves the angular scale — the fix for the distorted spread you saw. Both anchor
+  // buildings then sit exactly where you pointed, and the third is placed by the same map.
+  function setCalibHint(msg) { $('#calibHint').textContent = msg; }
+
+  function resetCalibration() {
+    calRefSensor = 0; calRefBearing = 0; calScale = 1; calPoint1 = null;
+    setCalibHint('Calibration reset. Aim at a known building and tap it. Tap two different buildings for the best fix.');
+  }
+
   function buildCalibButtons() {
     const box = $('#calibBtns');
     box.innerHTML = '';
@@ -348,14 +368,30 @@
       const btn = document.createElement('button');
       btn.textContent = b.name;
       btn.addEventListener('click', () => {
-        if (lastSensorHeading === null) { showErr('No sensor data yet.'); return; }
-        calibrationOffset = angleDiff(b.bearing, lastSensorHeading);
-        curHeading = b.bearing;      // snap immediately instead of waiting for the filter to catch up
-        headingSpikeStreak = 0;
+        if (filteredSensor === null) { showErr('No sensor data yet — move the phone a moment.'); return; }
+        const sensorNow = filteredSensor;
+
+        if (!calPoint1 || calPoint1.name === b.name) {
+          // First point (or re-tapping the same building restarts): offset only, scale 1.
+          calPoint1 = { sensor: sensorNow, bearing: b.bearing, name: b.name };
+          calRefSensor = sensorNow; calRefBearing = b.bearing; calScale = 1;
+          setCalibHint(`① ${b.name} set. Now aim at a DIFFERENT building and tap it to correct the spread.`);
+        } else {
+          // Second point: solve offset + scale so BOTH buildings land where you aimed.
+          const dSensor = angleDiff(sensorNow, calPoint1.sensor);
+          const dBearing = angleDiff(b.bearing, calPoint1.bearing);
+          if (Math.abs(dSensor) < 3) { showErr('Second building too close to the first — pick one further to the side.'); return; }
+          calScale = dBearing / dSensor;
+          calRefSensor = calPoint1.sensor;
+          calRefBearing = calPoint1.bearing;
+          setCalibHint(`✓ Calibrated on ${calPoint1.name} + ${b.name} (scale ${calScale.toFixed(2)}×). Re-tap any building to redo.`);
+          calPoint1 = null;
+        }
       });
       box.appendChild(btn);
     }
   }
+  $('#calibReset').addEventListener('click', resetCalibration);
 
   // ---- Landscape guard ----
   function checkOrientation() {
