@@ -46,7 +46,7 @@
 </head>
 <body>
 
-<div id="version">v1.3 · WebXR auto-place</div>
+<div id="version">v1.4 · WebXR steady</div>
 
 <div id="gate">
   <h1>KPF Edge AR — WebXR</h1>
@@ -159,13 +159,12 @@ function alignOn(ref) {
 
   for (const b of BUILDINGS) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
-    const dir = dirFromYaw(refYaw + dTheta, 0);                            // elevation 0 (horizon) for now
-    const pos = anchorPos.clone().add(dir.multiplyScalar(PLACE_DIST));
+    b.dir = dirFromYaw(refYaw + dTheta, 0).normalize();                   // fixed DIRECTION (behaves like infinity)
     if (b.sprite) scene.remove(b.sprite);
     const sprite = makeLabel(b.name);
-    sprite.position.copy(pos);
+    sprite.position.copy(anchorPos).addScaledVector(b.dir, PLACE_DIST);
     scene.add(sprite);
-    b.sprite = sprite; b.pos = pos;
+    b.sprite = sprite;
   }
   aligned = true;
   setStatus(`Aligned on ${ref.name}. Pan around — all labels are placed and welded. Tap one for info.`);
@@ -190,9 +189,8 @@ function onSelect(){
   if (performance.now() < ignoreSelectUntil) return;   // ignore taps that were on buttons
   let best = null, bestDot = Math.cos(12 * Math.PI/180);   // within ~12° of center
   for (const b of BUILDINGS) {
-    if (!b.sprite) continue;
-    const dir = b.pos.clone().sub(camPos).normalize();
-    const d = dir.dot(camForward);
+    if (!b.dir) continue;
+    const d = b.dir.dot(camForward);
     if (d > bestDot) { bestDot = d; best = b; }
   }
   if (best) showInfo(best);
@@ -277,6 +275,14 @@ function render() {
   const xrCam = renderer.xr.getCamera();
   xrCam.getWorldPosition(camPos);
   camForward.set(0,0,-1).transformDirection(xrCam.matrixWorld).normalize();
+
+  // Keep each label a fixed DIRECTION from the current camera position, so hand-shake
+  // translation doesn't parallax it — distant buildings behave like they're at infinity.
+  if (aligned) {
+    for (const b of BUILDINGS) {
+      if (b.sprite && b.dir) b.sprite.position.copy(camPos).addScaledVector(b.dir, PLACE_DIST);
+    }
+  }
   renderer.render(scene, camera);
 }
 
