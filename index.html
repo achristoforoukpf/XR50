@@ -97,7 +97,7 @@
     <div class="row" id="calibBtns"></div>
   </div>
   <div id="tune">
-    <div class="row"><span class="label">FOV</span><input type="range" id="fov" min="35" max="90" value="62" step="1"><span id="fovVal">62°</span></div>
+    <div class="row"><span class="label">FOV</span><input type="range" id="fov" min="15" max="100" value="45" step="1"><span id="fovVal">45°</span></div>
     <div class="row"><span class="label">Vert. trim</span><input type="range" id="trim" min="-20" max="20" value="0" step="1"><span id="trimVal">0°</span></div>
     <div class="row"><span class="label">Pan dir</span><button id="flipBtn" style="pointer-events:auto;background:rgba(255,255,255,0.18);border:1px solid rgba(255,255,255,0.4);color:#fff;font-size:12px;font-weight:600;padding:6px 10px;border-radius:8px;">Flip pan (A)</button><span style="opacity:.6">if left/right is reversed</span></div>
   </div>
@@ -122,7 +122,7 @@
 </div>
 
 <div id="gate">
-  <div id="version">v1.0 · gyro + manual anchor</div>
+  <div id="version">v1.1 · FOV tuning</div>
   <h1>KPF Edge AR — Office Test</h1>
   <p>Heading comes from the <b>gyroscope</b> (smooth, immune to steel). Because these buildings are too close for coordinate math, you <b>place each one by eye</b>: aim the crosshair at a building and tap its <b>Place</b> button — it then sticks glued to that building as you pan. Hold the phone <b>upright in portrait</b>.</p>
   <button id="startBtn">Start camera &amp; sensors</button>
@@ -196,7 +196,7 @@
   let curHeading = null, curPitch = null;    // what drives rendering
   let haveHeading = false;                   // true once the gyro has produced a heading
   let haveMotion = false;                    // true once devicemotion fires at all
-  let fov = 62;                              // horizontal field of view (deg) — tune to match camera
+  let fov = 45;                              // horizontal field of view (deg) — portrait is narrower than you'd think; tune to match camera
   let pitchTrim = 0;                         // manual vertical nudge for preloaded pins (deg) — no height data yet
   let panSign = -1;                          // flips if left/right pan is inverted on a given device
 
