@@ -52,7 +52,7 @@
 </head>
 <body>
 
-<div id="version">v1.6 · forgiving tap + depth fade</div>
+<div id="version">v1.7 · device detection</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -277,13 +277,54 @@ flip.addEventListener('click', (e)=> { e.stopPropagation(); dirSign = -dirSign; 
 btnBox.appendChild(flip);
 
 // ---- WebXR setup ----
+// ---- Device detection ----
+function detectDevice() {
+  const ua = navigator.userAgent;
+  // iPadOS 13+ Safari reports as "Macintosh"; disambiguate with touch points.
+  const iOS = /iPad|iPhone|iPod/.test(ua) ||
+              (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1) ||
+              (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
+  const android = /Android/.test(ua);
+  const mobile = iOS || android || /Mobi/.test(ua) || navigator.maxTouchPoints > 1;
+  return { iOS, android, mobile };
+}
+
+function showUnsupported(html) {
+  $('#enterBtn').style.display = 'none';
+  const el = $('#unsupported');
+  el.innerHTML = html;
+  el.style.display = 'block';
+}
+
 async function init() {
-  const supported = navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
-  if (!supported) {
-    $('#enterBtn').style.display = 'none';
-    $('#unsupported').style.display = 'block';
+  const dev = detectDevice();
+
+  // iPhones/iPads can't run WebXR at all (Safari limitation) — give an honest message, not an error.
+  if (dev.iOS) {
+    showUnsupported(
+      "<b>iPhone &amp; iPad aren't supported in this web version.</b><br><br>" +
+      "Apple's Safari doesn't support WebXR, and every iOS browser is required to use Safari's engine — so there's no browser that can run this on an iPhone/iPad. " +
+      "The <b>native app</b> (in development) will cover iOS. For now, open this link on an <b>Android phone in Chrome</b>."
+    );
     return;
   }
+
+  const supported = navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
+  if (!supported) {
+    if (dev.android) {
+      showUnsupported(
+        "<b>AR isn't available on this Android device yet.</b><br><br>" +
+        "Open in <b>Chrome</b> (not Samsung Internet / in-app browsers), and make sure <b>Chrome is updated</b> and <b>Google Play Services for AR</b> is installed (Play Store will prompt automatically on most phones)."
+      );
+    } else {
+      showUnsupported(
+        "<b>Open this on your phone.</b><br><br>" +
+        "This AR experience runs on a mobile device — scan the QR code or open this link on an <b>Android phone in Chrome</b>. (iPhone/iPad need the native app.)"
+      );
+    }
+    return;
+  }
+
   $('#enterBtn').disabled = false;
   $('#enterBtn').textContent = 'Enter AR';
   $('#enterBtn').addEventListener('click', enterAR);
