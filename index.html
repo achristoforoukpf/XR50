@@ -93,7 +93,7 @@
 
 <div id="bottom">
   <div id="calib">
-    <div class="hint" id="calibHint">Aim the crosshair at a known building and tap it once to lock heading. Re-tap anytime if it drifts.</div>
+    <div class="hint" id="calibHint">Aim the crosshair at each building and tap to place it. It'll then stick as you pan. Re-tap to reposition.</div>
     <div class="row" id="calibBtns"></div>
   </div>
   <div id="tune">
@@ -122,9 +122,9 @@
 </div>
 
 <div id="gate">
-  <div id="version">v0.9 · gyro tracking</div>
+  <div id="version">v1.0 · gyro + manual anchor</div>
   <h1>KPF Edge AR — Office Test</h1>
-  <p>Heading now comes from the <b>gyroscope</b> (smooth, immune to steel), not the compass. After starting: tap <b>Calibrate</b>, aim the crosshair at a building you can identify, and tap its name once to lock heading. Pan to check the others. Hold the phone <b>upright in portrait</b>.</p>
+  <p>Heading comes from the <b>gyroscope</b> (smooth, immune to steel). Because these buildings are too close for coordinate math, you <b>place each one by eye</b>: aim the crosshair at a building and tap its <b>Place</b> button — it then sticks glued to that building as you pan. Hold the phone <b>upright in portrait</b>.</p>
   <button id="startBtn">Start camera &amp; sensors</button>
   <p style="font-size:12px;opacity:.6">Requires camera + motion permissions. iPad Wi-Fi models may lack a compass.</p>
 </div>
@@ -203,12 +203,12 @@
   // GYRO-BASED HEADING (no magnetometer):
   //   `gyroHeading` integrates yaw rate about the world-vertical axis — smooth and immune to
   //   steel interference, but has no idea of true north on its own (and drifts slowly).
-  //   A calibration tap on a known building sets `headingOffset` so:
-  //       curHeading = gyroHeading + headingOffset  == that building's true bearing.
-  //   Because the gyro reports TRUE angular change, 1° of pan = 1° of heading — so a single
-  //   tap fully locks it; no scale factor (and no noise amplification) needed.
+  //   Office mode: headingOffset stays 0, so curHeading == gyroHeading, and each pin stores the
+  //   gyroHeading at the moment you anchor it — so 1° of pan = 1° of pin motion (perfect stick).
+  //   At The Edge, headingOffset would instead be set from one landmark to align gyro-space to
+  //   true north, letting distant buildings auto-place from coordinates.
   let gyroHeading = 0;                       // integrated relative yaw (deg, unbounded)
-  let headingOffset = 0;                     // added to gyroHeading to get a true bearing
+  let headingOffset = 0;                     // 0 in office/manual-anchor mode
   let gravity = { x: 0, y: 0, z: 0 };        // low-passed gravity vector (device frame)
   let lastMotionTs = null;
 
@@ -272,6 +272,11 @@
                       + `<br>pitch ${curPitch===null?'—':curPitch.toFixed(0)}°`;
 
     for (const pin of pins) {
+      if (!pin.anchored) {                          // not placed yet — hide until you anchor it by eye
+        if (pin.el) { pin.el.remove(); pin.el = null; }
+        if (pin.edge) { pin.edge.remove(); pin.edge = null; }
+        continue;
+      }
       const p = project(pin);
       if (!p) continue;
       const W = window.innerWidth, H = window.innerHeight;
@@ -311,7 +316,7 @@
     if (curHeading === null || curPitch === null) { showErr('No sensor data yet — move the phone a moment.'); return; }
     pinCount++;
     const label = prompt('Label for this object:', 'Object ' + pinCount) || ('Object ' + pinCount);
-    pins.push({ id: pinCount, label, name: label, heading: curHeading, pitch: curPitch, el: null, edge: null, info: placeholderInfo(label, null) });
+    pins.push({ id: pinCount, label, name: label, heading: curHeading, pitch: curPitch, anchored: true, el: null, edge: null, info: placeholderInfo(label, null) });
   }
   function clearPins() {
     for (const p of pins) { if (p.el) p.el.remove(); if (p.edge) p.edge.remove(); }
@@ -333,20 +338,23 @@
   function loadKnownBuildings() {
     for (const b of BUILDINGS) {
       const { bearing, dist } = bearingDistance(OFFICE.lat, OFFICE.lon, b.lat, b.lon);
-      b.bearing = bearing; b.dist = dist;           // stash on BUILDINGS too, for the calibration buttons
+      b.bearing = bearing; b.dist = dist;           // stash on BUILDINGS for the info card / distance
       pinCount++;
-      pins.push({
+      const pin = {
         id: pinCount, label: `${b.name} (${Math.round(dist)}m)`, name: b.name,
-        heading: bearing, pitch: 0, el: null, edge: null,
+        heading: bearing, pitch: 0, anchored: false, el: null, edge: null,
         info: placeholderInfo(b.name, dist),
-      });
+      };
+      b.pin = pin;                                  // link building -> its pin so calibration can anchor it
+      pins.push(pin);
     }
   }
 
-  // ---- Calibration ----
-  // Aim the crosshair at a known building and tap it. Because the gyro already reports true
-  // angular change, ONE tap fully locks heading — it just tells the app "north-relative, this
-  // direction is that building's real bearing." Re-tap anytime to correct slow gyro drift.
+  // ---- Placement / calibration (per-building anchoring) ----
+  // At close range, coordinate bearings have the wrong SPREAD, so pins can't be auto-placed and
+  // still stick to the video. Instead: aim the crosshair at each building and tap it once. The
+  // gyro records that exact direction+pitch; because gyro tracks 1:1, the pin then sticks glued
+  // to that building as you pan. (At The Edge, distant targets auto-place from coords instead.)
   function setCalibHint(msg) { $('#calibHint').textContent = msg; }
 
   function buildCalibButtons() {
@@ -354,12 +362,17 @@
     box.innerHTML = '';
     for (const b of BUILDINGS) {
       const btn = document.createElement('button');
-      btn.textContent = b.name;
+      btn.textContent = 'Place ' + b.name;
       btn.addEventListener('click', () => {
-        if (!haveHeading) { showErr('No gyro data yet — move the phone a moment.'); return; }
-        headingOffset = angleDiff(b.bearing, gyroHeading);   // so curHeading == b.bearing right now
-        curHeading = gyroHeading + headingOffset;
-        setCalibHint(`✓ Locked to ${b.name}. Pan to check the others; re-tap any building if it drifts.`);
+        if (!haveHeading || curPitch === null) { showErr('No gyro data yet — move the phone a moment.'); return; }
+        b.pin.heading = curHeading;      // anchor to exactly where you're aiming right now
+        b.pin.pitch = curPitch;
+        b.pin.anchored = true;
+        btn.textContent = '✓ ' + b.name;
+        const done = BUILDINGS.filter(x => x.pin.anchored).length;
+        setCalibHint(done < BUILDINGS.length
+          ? `Placed ${b.name}. Now aim at another building and tap to place it (${done}/${BUILDINGS.length}).`
+          : `All ${done} placed. They should now stick as you pan. Re-tap any to reposition.`);
       });
       box.appendChild(btn);
     }
