@@ -55,7 +55,7 @@
 </head>
 <body>
 
-<div id="version">v2.0 · iOS enter-AR debug</div>
+<div id="version">v2.1 · persistent error</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -375,8 +375,11 @@ async function enterAR() {
     $('#overlay').style.display = 'block';
     renderer.setAnimationLoop(render);
   } catch (e) {
-    // Surface the REAL reason (was previously written to a hidden element / thrown silently).
-    alert('AR failed to start:\n\n' + (e && e.message ? e.message : String(e)));
+    // Surface the REAL reason, and make it STICK on screen (alerts get dismissed / suppressed in the viewer).
+    const msg = e ? ((e.name ? e.name + ': ' : '') + (e.message || String(e))) : 'unknown error';
+    const el = $('#unsupported');
+    el.innerHTML = '<b>AR failed to start.</b><br><br><span style="font-family:monospace;font-size:12px">' + msg + '</span><br><br>Screenshot this and send it over.';
+    el.style.display = 'block';
     $('#enterBtn').textContent = 'Enter AR — retry';
     $('#gate').style.display = 'flex';
     $('#overlay').style.display = 'none';
