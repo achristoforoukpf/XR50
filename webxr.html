@@ -52,7 +52,7 @@
 </head>
 <body>
 
-<div id="version">v1.5 · cover art</div>
+<div id="version">v1.6 · forgiving tap + depth fade</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -246,10 +246,11 @@ function showInfo(b){
 }
 $('#infoClose').addEventListener('click', ()=> $('#infoCard').classList.remove('open'));
 
-// Tapping the AR view: open info for whichever placed label you're aiming closest to.
+// Tapping the AR view: open info for whichever label you're aiming nearest to.
+// Generous ~26° cone so you don't have to aim precisely.
 function onSelect(){
   if (performance.now() < ignoreSelectUntil) return;   // ignore taps that were on buttons
-  let best = null, bestDot = Math.cos(12 * Math.PI/180);   // within ~12° of center
+  let best = null, bestDot = Math.cos(26 * Math.PI/180);
   for (const b of BUILDINGS) {
     if (!b.dir) continue;
     const d = b.dir.dot(camForward);
@@ -340,9 +341,18 @@ function render() {
 
   // Keep each label a fixed DIRECTION from the current camera position, so hand-shake
   // translation doesn't parallax it — distant buildings behave like they're at infinity.
+  // Also fade by distance (far = faint) and brighten the one you're aiming at.
   if (aligned) {
+    const clamp = (v,a,b)=> Math.max(a, Math.min(b, v));
     for (const b of BUILDINGS) {
-      if (b.sprite && b.dir) b.sprite.position.copy(camPos).addScaledVector(b.dir, PLACE_DIST);
+      if (!b.sprite || !b.dir) continue;
+      b.sprite.position.copy(camPos).addScaledVector(b.dir, PLACE_DIST);
+      // distance fade: ~full at <=200m, fading to 0.25 by ~1500m
+      const distOp = clamp(1 - (b.dist - 200) / (1500 - 200), 0.25, 1);
+      // focus: brighten toward full as you aim at it (dot 0.94≈20° → 0.995≈6°)
+      const dot = b.dir.dot(camForward);
+      const focus = clamp((dot - Math.cos(20*Math.PI/180)) / (Math.cos(6*Math.PI/180) - Math.cos(20*Math.PI/180)), 0, 1);
+      b.sprite.material.opacity = distOp + (1 - distOp) * focus;   // never below distOp, up to 1 when centered
     }
   }
   renderer.render(scene, camera);
