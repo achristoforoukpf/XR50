@@ -44,8 +44,12 @@
   #status { position:fixed; top:calc(40px + env(safe-area-inset-top)); left:12px; right:12px; text-align:center; font-size:13px; font-weight:600; text-shadow:0 1px 3px #000; }
 
   #placeBtns { position:fixed; left:0; right:0; bottom:calc(20px + env(safe-area-inset-bottom)); display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding:0 12px; }
-  #placeBtns button { background:rgba(20,110,220,0.95); border:2px solid #fff; color:#fff; font-size:14px; font-weight:700; padding:12px 16px; border-radius:24px; box-shadow:0 3px 10px rgba(0,0,0,.5); }
-  #placeBtns button.done { background:rgba(0,0,0,0.7); }
+  #placeBtns button { background:rgba(10,30,66,0.92); border:1.5px solid #fff; color:#fff; font-size:14px; font-weight:600; padding:12px 16px; border-radius:24px; box-shadow:0 3px 10px rgba(0,0,0,.5); }
+  #placeBtns button.done { background:rgba(10,30,66,0.6); }
+  /* Once aligned, collapse the align buttons to a single Re-align chip to declutter the view */
+  #reAlignChip { display:none; }
+  #placeBtns.collapsed .alignbtn { display:none; }
+  #placeBtns.collapsed #reAlignChip { display:block; }
 
   #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
@@ -63,7 +67,7 @@
 </head>
 <body>
 
-<div id="version">v2.7 · clean glyphs</div>
+<div id="version">v2.8 · polish pass</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -207,11 +211,11 @@ function alignOn(ref) {
   for (const b of BUILDINGS) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
     b.dir = dirFromYaw(refYaw + dTheta, 0).normalize();                   // fixed DIRECTION (behaves like infinity)
+    b.appear = 0;                                                          // restart fade-in animation
   }
   aligned = true;
   setStatus(`Aligned on ${ref.name}. Pan around — all labels are placed and welded. Tap one for info.`);
-  [...document.querySelectorAll('#placeBtns button')].forEach(x => x.classList.remove('done'));
-  ref._btn && ref._btn.classList.add('done');
+  $('#placeBtns').classList.add('collapsed');                             // tuck the align buttons into a Re-align chip
 }
 
 function setStatus(t){ $('#status').textContent = t; }
@@ -225,6 +229,31 @@ function showInfo(b){
   $('#infoCard').classList.add('open');
 }
 $('#infoClose').addEventListener('click', ()=> $('#infoCard').classList.remove('open'));
+
+// Swipe-down to dismiss the info card.
+(() => {
+  const card = $('#infoCard');
+  let startY = 0, dy = 0, dragging = false;
+  card.addEventListener('pointerdown', e => {
+    dragging = true; startY = e.clientY; dy = 0;
+    card.style.transition = 'none';
+    try { card.setPointerCapture(e.pointerId); } catch (_) {}
+  });
+  card.addEventListener('pointermove', e => {
+    if (!dragging) return;
+    dy = e.clientY - startY;
+    if (dy > 0) card.style.transform = `translateY(${dy}px)`;   // only follow downward drags
+  });
+  const end = () => {
+    if (!dragging) return;
+    dragging = false;
+    card.style.transition = '';
+    card.style.transform = '';
+    if (dy > 80) card.classList.remove('open');                 // dragged far enough → dismiss
+  };
+  card.addEventListener('pointerup', end);
+  card.addEventListener('pointercancel', end);
+})();
 
 // Tapping the AR view: open info for whichever label you're aiming nearest to.
 // Generous ~26° cone so you don't have to aim precisely.
@@ -243,6 +272,7 @@ function onSelect(){
 const btnBox = $('#placeBtns');
 BUILDINGS.forEach(b => {
   const btn = document.createElement('button');
+  btn.className = 'alignbtn';
   btn.textContent = 'Align: ' + b.name;
   b._btn = btn;
   btn.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
@@ -251,10 +281,18 @@ BUILDINGS.forEach(b => {
 });
 // Mirror toggle — if left/right ends up flipped, one tap corrects it (re-align after).
 const flip = document.createElement('button');
-flip.textContent = '⇄ Mirror';
+flip.className = 'alignbtn';
+flip.textContent = '⇄︎ Mirror';
 flip.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
 flip.addEventListener('click', (e)=> { e.stopPropagation(); dirSign = -dirSign; setStatus('Mirror flipped — re-tap an Align button.'); });
 btnBox.appendChild(flip);
+// Re-align chip — shown after alignment; tap to bring the align buttons back.
+const reAlign = document.createElement('button');
+reAlign.id = 'reAlignChip';
+reAlign.textContent = 'Re-align';
+reAlign.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
+reAlign.addEventListener('click', (e)=> { e.stopPropagation(); btnBox.classList.remove('collapsed'); setStatus('Aim at a building you recognize and tap its Align button.'); });
+btnBox.appendChild(reAlign);
 
 // ---- WebXR setup ----
 // ---- Device detection ----
@@ -388,6 +426,7 @@ function render() {
     const tanH = 1 / proj.elements[0], tanV = 1 / proj.elements[5];
     const W = innerWidth, H = innerHeight, cx = W/2, cy = H/2, mx = cx - 48, my = cy - 72;
 
+    const onList = [];
     for (const b of BUILDINGS) {
       if (!b.dir) continue;
       // Lazily create the DOM label + edge arrow for this building.
@@ -398,23 +437,21 @@ function render() {
         $('#overlay').appendChild(b.labelEl);
       }
       if (!b.arrowEl) { b.arrowEl = document.createElement('div'); b.arrowEl.className = 'arrow'; $('#overlay').appendChild(b.arrowEl); }
+      if (b.appear === undefined) b.appear = 0;
+      b.appear = Math.min(1, b.appear + 0.05);        // fade-in ramp (~0.35s)
 
       // Opacity: dim far buildings, brighten the one you're aiming toward ("approach" = look at it).
       const distOp = clamp(1 - (b.dist - 200) / (1500 - 200), 0.25, 1);
       const fwd = b.dir.dot(camForward), right = b.dir.dot(camRight), up = b.dir.dot(camUp);
       const focus = clamp((fwd - Math.cos(20*Math.PI/180)) / (Math.cos(6*Math.PI/180) - Math.cos(20*Math.PI/180)), 0, 1);
-      const op = distOp + (1 - distOp) * focus;
+      const op = (distOp + (1 - distOp) * focus) * b.appear;
 
-      // On-screen test (approx, from view-space projection).
       const ndcX = fwd > 0 ? (right/fwd)/tanH : 99, ndcY = fwd > 0 ? (up/fwd)/tanV : 99;
       const onScreen = fwd > 0 && Math.abs(ndcX) <= 1 && Math.abs(ndcY) <= 1;
 
       if (onScreen) {
         b.arrowEl.style.display = 'none';
-        b.labelEl.style.display = 'block';
-        b.labelEl.style.left = (cx + ndcX * cx) + 'px';
-        b.labelEl.style.top  = (cy - ndcY * cy) + 'px';
-        b.labelEl.style.opacity = op.toFixed(3);
+        onList.push({ b, x: cx + ndcX * cx, y: cy - ndcY * cy, op });
       } else {
         b.labelEl.style.display = 'none';
         // Point an edge indicator toward the off-screen label.
@@ -427,6 +464,24 @@ function render() {
         b.arrowEl.textContent = chevron(sdx, sdy) + ' ' + b.name;
         b.arrowEl.style.display = 'block';
       }
+    }
+
+    // Collision avoidance: nudge labels that are close horizontally apart vertically so they don't overlap.
+    onList.sort((a, b) => a.y - b.y);
+    const GAP = 40, XNEAR = 150;
+    for (let i = 1; i < onList.length; i++)
+      for (let j = 0; j < i; j++)
+        if (Math.abs(onList[i].x - onList[j].x) < XNEAR && onList[i].y - onList[j].y < GAP)
+          onList[i].y = onList[j].y + GAP;
+
+    for (const it of onList) {
+      const el = it.b.labelEl;
+      el.style.display = 'block';
+      el.style.left = it.x + 'px';
+      el.style.top = it.y + 'px';
+      el.style.opacity = it.op.toFixed(3);
+      const s = 0.92 + 0.08 * it.b.appear;             // subtle scale-in with the fade
+      el.style.transform = `translate(-50%,-50%) scale(${s.toFixed(3)})`;
     }
   }
   renderer.render(scene, camera);
