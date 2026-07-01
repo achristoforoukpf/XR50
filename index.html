@@ -17,10 +17,24 @@
   #crosshair::after  { height: 2px; width: 26px; top: -1px; left: -13px; }
 
   /* Pins */
-  .pin { position: fixed; z-index: 3; transform: translate(-50%,-100%); pointer-events: none; transition: opacity .15s; }
+  .pin { position: fixed; z-index: 3; transform: translate(-50%,-100%); pointer-events: auto; transition: opacity .15s; cursor: pointer; }
   .pin .label { background: rgba(20,110,220,0.92); border: 1px solid rgba(255,255,255,0.6); padding: 5px 10px; border-radius: 14px; font-size: 14px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
   .pin .stem { width: 2px; height: 16px; background: rgba(255,255,255,0.8); margin: 0 auto; }
-  .pin .dot  { width: 12px; height: 12px; border-radius: 50%; background: #fff; border: 2px solid rgba(20,110,220,1); margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,.5); }
+  .pin .dot  { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid rgba(20,110,220,1); margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,.5); }
+  .pin.has-info .dot::after { content: "i"; display: block; text-align: center; font-size: 10px; font-weight: 800; line-height: 12px; color: rgba(20,110,220,1); font-style: italic; }
+
+  /* Info card */
+  #infoBackdrop { position: fixed; inset: 0; z-index: 8; background: rgba(0,0,0,0.45); display: none; }
+  #infoCard { position: fixed; left: 0; right: 0; bottom: 0; z-index: 9; background: #12233f; border-top: 1px solid rgba(255,255,255,0.25); border-radius: 18px 18px 0 0; padding: 18px 18px calc(18px + env(safe-area-inset-bottom)); transform: translateY(105%); transition: transform .25s ease; box-shadow: 0 -6px 24px rgba(0,0,0,.5); max-height: 60vh; overflow-y: auto; }
+  #infoCard.open { transform: translateY(0); }
+  #infoCard .close { position: absolute; top: 10px; right: 14px; background: none; border: none; color: #fff; font-size: 22px; opacity: .7; pointer-events: auto; }
+  #infoCard h2 { font-size: 19px; font-weight: 800; margin-bottom: 2px; padding-right: 30px; }
+  #infoCard .sub { font-size: 12px; opacity: .65; margin-bottom: 14px; }
+  #infoCard .fields { display: grid; grid-template-columns: auto 1fr; gap: 6px 14px; font-size: 13px; margin-bottom: 12px; }
+  #infoCard .fields dt { opacity: .6; font-weight: 600; }
+  #infoCard .fields dd { font-weight: 600; }
+  #infoCard .desc { font-size: 13px; line-height: 1.5; opacity: .85; border-top: 1px solid rgba(255,255,255,0.15); padding-top: 12px; }
+  #infoCard .placeholder-tag { display: inline-block; margin-top: 10px; font-size: 11px; padding: 3px 8px; border-radius: 8px; background: rgba(230,150,20,0.25); color: #ffcf8a; font-weight: 700; }
 
   /* Off-screen edge arrows */
   .edge { position: fixed; z-index: 3; background: rgba(20,110,220,0.92); border: 1px solid rgba(255,255,255,0.6); padding: 4px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; pointer-events: none; white-space: nowrap; }
@@ -74,6 +88,16 @@
 
 <div id="err"></div>
 
+<div id="infoBackdrop"></div>
+<div id="infoCard">
+  <button class="close" id="infoClose">&times;</button>
+  <h2 id="infoName">—</h2>
+  <div class="sub" id="infoSub">—</div>
+  <dl class="fields" id="infoFields"></dl>
+  <div class="desc" id="infoDesc"></div>
+  <div class="placeholder-tag">PLACEHOLDER DATA — demo only</div>
+</div>
+
 <div id="gate">
   <h1>KPF Edge AR — Office Test</h1>
   <p>3 known buildings load automatically from their real coordinates. Pan around to see if they track cleanly. You can also aim the crosshair at anything else and tap <b>Drop pin</b> to add an ad-hoc test pin. Hold the phone <b>upright in portrait</b>.</p>
@@ -85,6 +109,43 @@
 (() => {
   const $ = s => document.querySelector(s);
   const overlay = $('#overlay'), readout = $('#readout'), errBox = $('#err');
+
+  // ---- Placeholder info-card content ----
+  const PLACEHOLDER_BLURBS = [
+    "Placeholder project description — swap in the real write-up, project photography, and credits here once wired to KPF's project database.",
+    "This is demo copy only. In production this card would pull live from the project record: scope, completion date, awards, and design narrative.",
+    "Sample text for prototyping the info-card layout. Real content (renderings, stats, press) would load here per building.",
+  ];
+  function placeholderInfo(name, dist) {
+    return {
+      architect: "Kohn Pedersen Fox (placeholder)",
+      year: [2011, 2016, 2019][Math.floor(Math.random() * 3)] + " (placeholder)",
+      height: Math.round(400 + Math.random() * 500) + " ft (placeholder)",
+      stories: Math.round(30 + Math.random() * 50) + " (placeholder)",
+      distance: dist ? `${Math.round(dist)} m / ${Math.round(dist*3.281)} ft` : "—",
+      desc: PLACEHOLDER_BLURBS[Math.floor(Math.random() * PLACEHOLDER_BLURBS.length)],
+    };
+  }
+
+  function showInfo(pin) {
+    const info = pin.info;
+    $('#infoName').textContent = pin.name || pin.label;
+    $('#infoSub').textContent = info.distance !== "—" ? `${info.distance} away` : "Ad-hoc test pin";
+    $('#infoFields').innerHTML = `
+      <dt>Architect</dt><dd>${info.architect}</dd>
+      <dt>Completed</dt><dd>${info.year}</dd>
+      <dt>Height</dt><dd>${info.height}</dd>
+      <dt>Stories</dt><dd>${info.stories}</dd>`;
+    $('#infoDesc').textContent = info.desc;
+    $('#infoCard').classList.add('open');
+    $('#infoBackdrop').style.display = 'block';
+  }
+  function hideInfo() {
+    $('#infoCard').classList.remove('open');
+    $('#infoBackdrop').style.display = 'none';
+  }
+  $('#infoClose').addEventListener('click', hideInfo);
+  $('#infoBackdrop').addEventListener('click', hideInfo);
 
   // ---- Known buildings (from Google Maps pin drops) ----
   // Same coordinates/engine as photo.html. Camera = 11 West 42nd St, ~6th floor (estimated).
@@ -189,10 +250,11 @@
       if (onScreen) {
         if (pin.edge) { pin.edge.remove(); pin.edge = null; }
         if (!pin.el) {
-          pin.el = document.createElement('div'); pin.el.className = 'pin';
+          pin.el = document.createElement('div'); pin.el.className = 'pin has-info';
           pin.el.innerHTML = `<div class="label"></div><div class="stem"></div><div class="dot"></div>`;
           overlay.appendChild(pin.el);
           pin.el.querySelector('.label').textContent = pin.label;
+          pin.el.addEventListener('click', () => showInfo(pin));
           pin.sx = p.x; pin.sy = p.y;
         }
         pin.sx += (p.x - pin.sx) * SMOOTH;
@@ -219,7 +281,7 @@
     if (curHeading === null || curPitch === null) { showErr('No sensor data yet — move the phone a moment.'); return; }
     pinCount++;
     const label = prompt('Label for this object:', 'Object ' + pinCount) || ('Object ' + pinCount);
-    pins.push({ id: pinCount, label, heading: curHeading, pitch: curPitch, el: null, edge: null });
+    pins.push({ id: pinCount, label, name: label, heading: curHeading, pitch: curPitch, el: null, edge: null, info: placeholderInfo(label, null) });
   }
   function clearPins() {
     for (const p of pins) { if (p.el) p.el.remove(); if (p.edge) p.edge.remove(); }
@@ -239,7 +301,11 @@
     for (const b of BUILDINGS) {
       const { bearing, dist } = bearingDistance(OFFICE.lat, OFFICE.lon, b.lat, b.lon);
       pinCount++;
-      pins.push({ id: pinCount, label: `${b.name} (${Math.round(dist)}m)`, heading: bearing, pitch: 0, el: null, edge: null });
+      pins.push({
+        id: pinCount, label: `${b.name} (${Math.round(dist)}m)`, name: b.name,
+        heading: bearing, pitch: 0, el: null, edge: null,
+        info: placeholderInfo(b.name, dist),
+      });
     }
   }
 
