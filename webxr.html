@@ -11,7 +11,9 @@
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   /* background MUST stay transparent — on iOS (Variant Launch) the camera renders BEHIND the page,
      so any opaque body background hides the passthrough. The gate has its own full-screen bg. */
-  html,body { width:100%; height:100%; overflow:hidden; background:transparent; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#fff; }
+  html,body { width:100%; height:100%; overflow:hidden; background:transparent; font-family:"Helvetica Neue",Helvetica,Arial,Roboto,sans-serif; color:#fff; -webkit-font-smoothing:antialiased; }
+  /* KPF brand palette */
+  :root { --kpf-navy:#21384a; --kpf-meta:#8b949c; --kpf-body:#55606b; --kpf-rule:#e3e6e9; }
 
   #version { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:0; right:0; text-align:center; font-size:13px; font-weight:700; letter-spacing:.5px; color:#4da3ff; z-index:30; }
 
@@ -22,7 +24,7 @@
   #cover { position:absolute; left:0; right:0; bottom:0; width:100%; z-index:0; pointer-events:none; }
   #cover svg { display:block; width:100%; height:auto; }
   #gate > *:not(#cover):not(#coverPhoto) { position:relative; z-index:1; }
-  #gate h1 { font-size:23px; font-weight:800; text-shadow:0 2px 12px rgba(0,0,0,.6); }
+  #gate h1 { font-size:26px; font-weight:700; letter-spacing:-.01em; text-shadow:0 2px 12px rgba(0,0,0,.6); }
   #gate p { font-size:14px; opacity:.9; max-width:330px; line-height:1.5; text-shadow:0 1px 6px rgba(0,0,0,.6); }
   #enterBtn { background:#fff; color:#0c2748; font-size:17px; font-weight:800; padding:16px 32px; border-radius:30px; border:none; box-shadow:0 6px 20px rgba(0,0,0,.4); }
   #enterBtn:disabled { opacity:.4; }
@@ -45,20 +47,21 @@
 
   #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
-  /* Info card */
-  #infoCard { position:fixed; left:0; right:0; bottom:0; z-index:12; background:#12233f; border-top:1px solid rgba(255,255,255,0.25); border-radius:18px 18px 0 0; padding:18px 18px calc(18px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .25s ease; box-shadow:0 -6px 24px rgba(0,0,0,.5); }
+  /* Info card — KPF brand styling: white, navy headings, wide-tracked uppercase meta labels */
+  #infoCard { position:fixed; left:0; right:0; bottom:0; z-index:12; background:#fff; border-radius:14px 14px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .25s ease; box-shadow:0 -8px 30px rgba(0,0,0,.35); }
   #infoCard.open { transform:translateY(0); }
-  #infoCard .close { position:absolute; top:10px; right:14px; background:none; border:none; color:#fff; font-size:22px; opacity:.7; }
-  #infoCard h2 { font-size:19px; font-weight:800; margin-bottom:2px; padding-right:30px; }
-  #infoCard .fields { display:grid; grid-template-columns:auto 1fr; gap:6px 14px; font-size:13px; margin:12px 0; }
-  #infoCard .fields dt { opacity:.6; font-weight:600; }
-  #infoCard .desc { font-size:13px; line-height:1.5; opacity:.85; border-top:1px solid rgba(255,255,255,.15); padding-top:12px; }
-  #infoCard .tag { display:inline-block; margin-top:10px; font-size:11px; padding:3px 8px; border-radius:8px; background:rgba(230,150,20,.25); color:#ffcf8a; font-weight:700; }
+  #infoCard .close { position:absolute; top:12px; right:16px; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; }
+  #infoCard h2 { color:var(--kpf-navy); font-size:24px; font-weight:700; letter-spacing:-.01em; margin-bottom:16px; padding-right:30px; }
+  #infoCard .fields { display:grid; grid-template-columns:auto 1fr; gap:10px 18px; font-size:14px; margin:0 0 16px; }
+  #infoCard .fields dt { text-transform:uppercase; letter-spacing:.11em; font-size:11px; font-weight:600; color:var(--kpf-meta); align-self:center; }
+  #infoCard .fields dd { color:var(--kpf-navy); font-weight:500; }
+  #infoCard .desc { font-size:14px; line-height:1.55; color:var(--kpf-body); border-top:1px solid var(--kpf-rule); padding-top:14px; }
+  #infoCard .tag { display:inline-block; margin-top:12px; text-transform:uppercase; letter-spacing:.08em; font-size:10px; padding:3px 8px; border-radius:6px; background:#f2ede3; color:#9a6a1e; font-weight:700; }
 </style>
 </head>
 <body>
 
-<div id="version">v2.4 · crisp text + edge arrows</div>
+<div id="version">v2.5 · KPF typography</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
