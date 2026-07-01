@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>KPF Edge AR — WebXR (Android)</title>
+<title>KPF Edge AR — WebXR</title>
+<!-- Variant Launch: brings WebXR (ARKit) to iOS via App Clip. Must load before the engine code. -->
+<!-- NOTE: this key only works on domains authorised in the Variant dashboard (add achristoforoukpf.github.io). -->
+<script src="https://launchar.app/sdk/v1?key=uKq7kzTwBxF3sDhbii6wlP7SsIngRGDD&redirect=true"></script>
 <style>
   * { margin:0; padding:0; box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
   html,body { width:100%; height:100%; overflow:hidden; background:#000; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#fff; }
@@ -52,7 +55,7 @@
 </head>
 <body>
 
-<div id="version">v1.8 · dimmed cover</div>
+<div id="version">v1.9 · iOS via Variant Launch</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -98,7 +101,7 @@
     </svg>
   </div>
   <h1>KPF Edge AR — WebXR</h1>
-  <p>Real visual tracking (Chrome + ARCore). Labels are <b>predefined</b> — you align once by aiming at a building you recognize and tapping it, and all labels snap into place and stay welded.</p>
+  <p>Real visual tracking on <b>Android</b> (ARCore) and <b>iPhone/iPad</b> (ARKit via Variant Launch — no app install). Labels are predefined: align once by aiming at a building you recognize and tapping it, and all labels snap into place and stay welded.</p>
   <button id="enterBtn" disabled>Checking device…</button>
   <div id="unsupported">This device/browser doesn't support WebXR AR. Open this page in <b>Chrome on an Android phone</b>. (iPhones/iPads need the native app — Safari has no WebXR.)</div>
   <p style="font-size:12px;opacity:.6">After entering: slowly move the phone a moment so tracking initializes, aim the crosshair at a building you can identify, and tap its <b>Align</b> button.</p>
@@ -299,35 +302,35 @@ function showUnsupported(html) {
 async function init() {
   const dev = detectDevice();
 
-  // iPhones/iPads can't run WebXR at all (Safari limitation) — give an honest message, not an error.
+  // Variant Launch provides WebXR on iOS via App Clip. Give it a moment to polyfill navigator.xr
+  // before we test support (its script loads in <head>). On iOS in plain Safari it will present
+  // its launch flow; inside the Launch viewer, immersive-ar becomes supported.
+  const supported = navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
+  if (supported) {
+    $('#enterBtn').disabled = false;
+    $('#enterBtn').textContent = 'Enter AR';
+    $('#enterBtn').addEventListener('click', enterAR);
+    return;
+  }
+
+  // Not (yet) supported here.
   if (dev.iOS) {
     showUnsupported(
-      "<b>iPhone &amp; iPad aren't supported in this web version.</b><br><br>" +
-      "Apple's Safari doesn't support WebXR, and every iOS browser is required to use Safari's engine — so there's no browser that can run this on an iPhone/iPad. " +
-      "The <b>native app</b> (in development) will cover iOS. For now, open this link on an <b>Android phone in Chrome</b>."
+      "<b>Preparing AR…</b><br><br>" +
+      "On iPhone/iPad this launches through an instant AR viewer (no install). If a prompt/banner appears, tap it. " +
+      "If nothing happens, make sure you opened this from the QR link, and that the site's domain is authorised in Variant Launch."
     );
-    return;
+  } else if (dev.android) {
+    showUnsupported(
+      "<b>AR isn't available on this Android device yet.</b><br><br>" +
+      "Open in <b>Chrome</b> (not Samsung Internet / in-app browsers), and make sure <b>Chrome is updated</b> and <b>Google Play Services for AR</b> is installed."
+    );
+  } else {
+    showUnsupported(
+      "<b>Open this on your phone.</b><br><br>" +
+      "This AR experience runs on a mobile device — scan the QR code or open this link on an <b>Android phone</b> or <b>iPhone</b>."
+    );
   }
-
-  const supported = navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
-  if (!supported) {
-    if (dev.android) {
-      showUnsupported(
-        "<b>AR isn't available on this Android device yet.</b><br><br>" +
-        "Open in <b>Chrome</b> (not Samsung Internet / in-app browsers), and make sure <b>Chrome is updated</b> and <b>Google Play Services for AR</b> is installed (Play Store will prompt automatically on most phones)."
-      );
-    } else {
-      showUnsupported(
-        "<b>Open this on your phone.</b><br><br>" +
-        "This AR experience runs on a mobile device — scan the QR code or open this link on an <b>Android phone in Chrome</b>. (iPhone/iPad need the native app.)"
-      );
-    }
-    return;
-  }
-
-  $('#enterBtn').disabled = false;
-  $('#enterBtn').textContent = 'Enter AR';
-  $('#enterBtn').addEventListener('click', enterAR);
 }
 
 async function enterAR() {
@@ -337,6 +340,7 @@ async function enterAR() {
   renderer.setPixelRatio(devicePixelRatio);
   renderer.setSize(innerWidth, innerHeight);
   renderer.xr.enabled = true;
+  renderer.xr.setReferenceSpaceType('local');   // Variant Launch (iOS) supports 'local', not 'local-floor'
   document.body.appendChild(renderer.domElement);
   renderer.domElement.style.position = 'fixed';
   renderer.domElement.style.inset = '0';
@@ -346,7 +350,7 @@ async function enterAR() {
 
   try {
     xrSession = await navigator.xr.requestSession('immersive-ar', {
-      optionalFeatures: ['dom-overlay', 'local-floor'],
+      optionalFeatures: ['dom-overlay'],
       domOverlay: { root: $('#overlay') },
     });
   } catch (e) {
