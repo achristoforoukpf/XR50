@@ -31,6 +31,7 @@
 
   /* DOM overlay (drawn over the AR camera feed) */
   #overlay { position:fixed; inset:0; z-index:10; display:none; }
+  .arrow { position:fixed; z-index:11; transform:translate(-50%,-50%); background:rgba(0,0,0,0.82); border:1px solid rgba(255,255,255,0.5); color:#fff; font-size:12px; font-weight:700; padding:5px 9px; border-radius:14px; white-space:nowrap; pointer-events:none; display:none; box-shadow:0 2px 8px rgba(0,0,0,.4); }
   #crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
   #crosshair::before, #crosshair::after { content:""; position:absolute; background:rgba(255,255,255,0.9); }
   #crosshair::before { width:2px; height:26px; left:-1px; top:-13px; }
@@ -57,7 +58,7 @@
 </head>
 <body>
 
-<div id="version">v2.3 · iOS camera fix</div>
+<div id="version">v2.4 · crisp text + edge arrows</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -177,29 +178,32 @@ BUILDINGS.forEach(b => { const bd=bearingDistance(OFFICE.lat,OFFICE.lon,b.lat,b.
 let renderer, scene, camera, xrSession = null;
 const camPos = new THREE.Vector3();
 const camForward = new THREE.Vector3();
+const camRight = new THREE.Vector3();
+const camUp = new THREE.Vector3();
 let ignoreSelectUntil = 0;
 let aligned = false;
 let dirSign = 1;                   // flip if left/right ends up mirrored on this device
 const PLACE_DIST = 40;             // meters: how far out billboards sit (readable, low walk-parallax)
 
 // ---- Label sprite (billboarded canvas text) ----
+// SS supersamples the canvas so text stays crisp on high-DPR phones (iPhone was pixelated at SS=1).
 function makeLabel(text) {
-  const pad = 24, fs = 44;
+  const SS = 4;
+  const pad = 24*SS, fs = 44*SS, r = 24*SS;
   const c = document.createElement('canvas'), g = c.getContext('2d');
   g.font = `700 ${fs}px -apple-system, Roboto, sans-serif`;
   const w = g.measureText(text).width + pad*2;
-  c.width = w; c.height = fs + pad*2;
+  c.width = Math.ceil(w); c.height = fs + pad*2;
   g.font = `700 ${fs}px -apple-system, Roboto, sans-serif`;
   g.fillStyle = 'rgba(0,0,0,0.85)';
-  const r = 24;
   g.beginPath();
   g.moveTo(r,0); g.arcTo(c.width,0,c.width,c.height,r); g.arcTo(c.width,c.height,0,c.height,r);
   g.arcTo(0,c.height,0,0,r); g.arcTo(0,0,c.width,0,r); g.closePath(); g.fill();
-  g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 3; g.stroke();
+  g.strokeStyle = 'rgba(255,255,255,0.6)'; g.lineWidth = 3*SS; g.stroke();
   g.fillStyle = '#fff'; g.textBaseline = 'middle'; g.textAlign = 'center';
   g.fillText(text, c.width/2, c.height/2);
   const tex = new THREE.CanvasTexture(c);
-  tex.anisotropy = 4;
+  tex.anisotropy = (renderer && renderer.capabilities) ? renderer.capabilities.getMaxAnisotropy() : 8;
   const mat = new THREE.SpriteMaterial({ map:tex, depthTest:false, transparent:true });
   const sp = new THREE.Sprite(mat);
   const scaleM = 6;                        // label ~6m wide at placement distance
@@ -390,26 +394,59 @@ async function enterAR() {
   }
 }
 
+const clamp = (v,a,b)=> Math.max(a, Math.min(b, v));
+const CHEVRONS = ['→','↘','↓','↙','←','↖','↑','↗'];
+function chevron(dx, dy) {
+  let d = (Math.atan2(dy, dx) * 180/Math.PI + 360) % 360;
+  return CHEVRONS[Math.round(d/45) % 8];
+}
+
 function render() {
   // Capture current camera pose (valid inside the XR frame) for placement + aim tests.
   const xrCam = renderer.xr.getCamera();
   xrCam.getWorldPosition(camPos);
-  camForward.set(0,0,-1).transformDirection(xrCam.matrixWorld).normalize();
+  const m = xrCam.matrixWorld.elements;
+  camRight.set(m[0], m[1], m[2]).normalize();
+  camUp.set(m[4], m[5], m[6]).normalize();
+  camForward.set(-m[8], -m[9], -m[10]).normalize();
 
-  // Keep each label a fixed DIRECTION from the current camera position, so hand-shake
-  // translation doesn't parallax it — distant buildings behave like they're at infinity.
-  // Also fade by distance (far = faint) and brighten the one you're aiming at.
   if (aligned) {
-    const clamp = (v,a,b)=> Math.max(a, Math.min(b, v));
+    // FOV half-tangents from the actual XR projection (per-eye camera if present).
+    const proj = (xrCam.cameras && xrCam.cameras[0]) ? xrCam.cameras[0].projectionMatrix : camera.projectionMatrix;
+    const tanH = 1 / proj.elements[0], tanV = 1 / proj.elements[5];
+    const W = innerWidth, H = innerHeight, cx = W/2, cy = H/2, mx = cx - 48, my = cy - 72;
+
     for (const b of BUILDINGS) {
       if (!b.sprite || !b.dir) continue;
+      // Direction-locked: hold a fixed bearing from the current camera pos (no parallax jitter).
       b.sprite.position.copy(camPos).addScaledVector(b.dir, PLACE_DIST);
-      // distance fade: ~full at <=200m, fading to 0.25 by ~1500m
+
+      // Opacity: dim far buildings, brighten the one you're aiming toward ("approach" = look at it).
       const distOp = clamp(1 - (b.dist - 200) / (1500 - 200), 0.25, 1);
-      // focus: brighten toward full as you aim at it (dot 0.94≈20° → 0.995≈6°)
       const dot = b.dir.dot(camForward);
       const focus = clamp((dot - Math.cos(20*Math.PI/180)) / (Math.cos(6*Math.PI/180) - Math.cos(20*Math.PI/180)), 0, 1);
-      b.sprite.material.opacity = distOp + (1 - distOp) * focus;   // never below distOp, up to 1 when centered
+      b.sprite.material.opacity = distOp + (1 - distOp) * focus;
+
+      // On-screen test (approx, from view-space projection).
+      const fwd = b.dir.dot(camForward), right = b.dir.dot(camRight), up = b.dir.dot(camUp);
+      const ndcX = fwd > 0 ? (right/fwd)/tanH : 99, ndcY = fwd > 0 ? (up/fwd)/tanV : 99;
+      const onScreen = fwd > 0 && Math.abs(ndcX) <= 1 && Math.abs(ndcY) <= 1;
+
+      b.sprite.visible = onScreen;
+      if (!b.arrowEl) { b.arrowEl = document.createElement('div'); b.arrowEl.className = 'arrow'; $('#overlay').appendChild(b.arrowEl); }
+      if (onScreen) {
+        b.arrowEl.style.display = 'none';
+      } else {
+        // Point an edge indicator toward the off-screen label.
+        let dx = fwd > 0.02 ? ndcX : right, dy = fwd > 0.02 ? ndcY : up;
+        let sdx = dx, sdy = -dy;                       // screen y is down
+        const L = Math.hypot(sdx, sdy) || 1; sdx /= L; sdy /= L;
+        const t = Math.min(Math.abs(sdx) < 1e-3 ? 1e9 : mx/Math.abs(sdx), Math.abs(sdy) < 1e-3 ? 1e9 : my/Math.abs(sdy));
+        b.arrowEl.style.left = (cx + sdx*t) + 'px';
+        b.arrowEl.style.top  = (cy + sdy*t) + 'px';
+        b.arrowEl.textContent = chevron(sdx, sdy) + ' ' + b.name;
+        b.arrowEl.style.display = 'block';
+      }
     }
   }
   renderer.render(scene, camera);
