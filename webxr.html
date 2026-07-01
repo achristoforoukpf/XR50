@@ -36,7 +36,6 @@
   .arrow { position:fixed; z-index:11; transform:translate(-50%,-50%); background:rgba(10,30,66,0.82); border:1px solid rgba(255,255,255,0.5); color:#fff; font-size:12px; font-weight:600; padding:5px 9px; border-radius:14px; white-space:nowrap; pointer-events:none; display:none; box-shadow:0 2px 8px rgba(0,0,0,.4); }
   /* Welded labels are DOM (crisp on all devices — the 3D canvas texture was blurred by iOS's reduced-res WebGL layer) */
   .arlabel { position:fixed; z-index:11; transform:translate(-50%,-50%); background:rgba(10,30,66,0.86); border:1px solid rgba(255,255,255,0.55); color:#fff; font-size:14px; font-weight:600; letter-spacing:.005em; padding:7px 13px; border-radius:20px; white-space:nowrap; pointer-events:auto; display:none; box-shadow:0 2px 10px rgba(0,0,0,.45); }
-  .arlabel::after { content:" ⓘ"; opacity:.7; font-weight:400; }
   #crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
   #crosshair::before, #crosshair::after { content:""; position:absolute; background:rgba(255,255,255,0.9); }
   #crosshair::before { width:2px; height:26px; left:-1px; top:-13px; }
@@ -64,7 +63,7 @@
 </head>
 <body>
 
-<div id="version">v2.6 · sharp DOM labels + KPF palette</div>
+<div id="version">v2.7 · clean glyphs</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -367,7 +366,8 @@ async function enterAR() {
 }
 
 const clamp = (v,a,b)=> Math.max(a, Math.min(b, v));
-const CHEVRONS = ['→','↘','↓','↙','←','↖','↑','↗'];
+// ︎ = text-presentation selector — forces monochrome arrows (no emoji rendering on iOS).
+const CHEVRONS = ['→︎','↘︎','↓︎','↙︎','←︎','↖︎','↑︎','↗︎'];
 function chevron(dx, dy) {
   let d = (Math.atan2(dy, dx) * 180/Math.PI + 360) % 360;
   return CHEVRONS[Math.round(d/45) % 8];
