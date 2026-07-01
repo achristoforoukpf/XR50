@@ -1,0 +1,102 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>KPF Edge AR — Photo Pin Prototype</title>
+<style>
+  * { margin:0; padding:0; box-sizing:border-box; -webkit-user-select:none; user-select:none; -webkit-tap-highlight-color:transparent; }
+  html,body { width:100%; background:#0b1f3a; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif; color:#fff; }
+  #stage { position:relative; width:100%; max-width:1200px; margin:0 auto; }
+  #stage img { width:100%; display:block; }
+  .pin { position:absolute; transform:translate(-50%,-100%); touch-action:none; }
+  .pin .label { background:rgba(20,110,220,0.94); border:1px solid rgba(255,255,255,0.6); padding:6px 10px; border-radius:14px; font-size:13px; font-weight:700; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.4); text-align:center; line-height:1.35; }
+  .pin .label small { display:block; font-weight:500; opacity:.85; font-size:11px; }
+  .pin .stem { width:2px; height:14px; background:rgba(255,255,255,0.85); margin:0 auto; }
+  .pin .dot { width:14px; height:14px; border-radius:50%; background:#fff; border:3px solid rgba(20,110,220,1); margin:0 auto; box-shadow:0 0 6px rgba(0,0,0,.5); }
+  .pin.dragging .label { background:rgba(230,150,20,0.95); }
+
+  #bar { max-width:1200px; margin:0 auto; padding:14px 16px calc(14px + env(safe-area-inset-bottom)); display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
+  #bar h1 { font-size:15px; font-weight:800; }
+  #bar p { font-size:12px; opacity:.75; }
+  .toggle { pointer-events:auto; background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.35); color:#fff; font-size:13px; font-weight:600; padding:9px 14px; border-radius:10px; }
+  .toggle:active { background:rgba(255,255,255,0.3); }
+</style>
+</head>
+<body>
+
+<div id="bar">
+  <div>
+    <h1>KPF Edge AR — Static Photo Prototype</h1>
+    <p>Drag pins to align them exactly, then tap "Log positions" to read out the tuned %.</p>
+  </div>
+  <button class="toggle" id="logBtn">Log positions</button>
+</div>
+
+<div id="stage">
+  <img src="office-view.png" alt="View south from KPF HQ, 11 West 42nd Street">
+</div>
+
+<script>
+  // Camera: 11 West 42nd St, ~6th floor (estimated rooftop-level coords — refine once surveyed)
+  // Bearings/distances below are computed live from lat/lng via the haversine bearing formula —
+  // this is the same engine that will drive live pin placement at The Edge.
+  const OFFICE = { lat: 40.7534, lon: -73.9828 };
+
+  const BUILDINGS = [
+    { id: 1, name: "Building 1", lat: 40.752282, lon: -73.982214, xPct: 11.5, yPct: 19 },
+    { id: 2, name: "Building 2", lat: 40.753454, lon: -73.985334, xPct: 64.5, yPct: 40 },
+    { id: 3, name: "Building 3", lat: 40.754673, lon: -73.984757, xPct: 90.0, yPct: 24 },
+  ];
+
+  function bearingDistance(lat1, lon1, lat2, lon2) {
+    const rad = d => d * Math.PI / 180;
+    const phi1 = rad(lat1), phi2 = rad(lat2), dLambda = rad(lon2 - lon1);
+    const y = Math.sin(dLambda) * Math.cos(phi2);
+    const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLambda);
+    const bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    const R = 6371000;
+    const dPhi = phi2 - phi1;
+    const a = Math.sin(dPhi/2)**2 + Math.cos(phi1)*Math.cos(phi2)*Math.sin(dLambda/2)**2;
+    const dist = 2 * R * Math.asin(Math.sqrt(a));
+    return { bearing, dist };
+  }
+
+  const stage = document.getElementById('stage');
+
+  BUILDINGS.forEach(b => {
+    const { bearing, dist } = bearingDistance(OFFICE.lat, OFFICE.lon, b.lat, b.lon);
+    b.bearing = bearing; b.dist = dist;
+
+    const el = document.createElement('div');
+    el.className = 'pin';
+    el.style.left = b.xPct + '%';
+    el.style.top = b.yPct + '%';
+    el.innerHTML = `
+      <div class="label">${b.name}<small>${bearing.toFixed(0)}° · ${Math.round(dist)}m / ${Math.round(dist*3.281)}ft</small></div>
+      <div class="stem"></div>
+      <div class="dot"></div>`;
+    stage.appendChild(el);
+    b.el = el;
+
+    // Drag to fine-tune (pointer events cover mouse + touch)
+    let dragging = false;
+    el.addEventListener('pointerdown', e => { dragging = true; el.classList.add('dragging'); el.setPointerCapture(e.pointerId); });
+    el.addEventListener('pointerup', () => { dragging = false; el.classList.remove('dragging'); });
+    el.addEventListener('pointermove', e => {
+      if (!dragging) return;
+      const rect = stage.getBoundingClientRect();
+      b.xPct = Math.min(100, Math.max(0, (e.clientX - rect.left) / rect.width * 100));
+      b.yPct = Math.min(100, Math.max(0, (e.clientY - rect.top) / rect.height * 100));
+      el.style.left = b.xPct + '%';
+      el.style.top = b.yPct + '%';
+    });
+  });
+
+  document.getElementById('logBtn').addEventListener('click', () => {
+    const lines = BUILDINGS.map(b => `${b.name}: xPct=${b.xPct.toFixed(1)}, yPct=${b.yPct.toFixed(1)}  (bearing ${b.bearing.toFixed(1)}°, ${Math.round(b.dist)}m)`);
+    alert(lines.join('\n'));
+  });
+</script>
+</body>
+</html>
