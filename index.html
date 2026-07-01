@@ -36,8 +36,10 @@
   #bottom { position: fixed; bottom: 0; left: 0; right: 0; z-index: 5; padding: 14px 12px calc(14px + env(safe-area-inset-bottom)); display: flex; flex-direction: column; gap: 10px; background: linear-gradient(rgba(0,0,0,0), rgba(0,0,0,.55)); }
   #dropBtn { pointer-events: auto; align-self: center; background: rgba(20,110,220,0.95); border: 2px solid #fff; color: #fff; font-size: 16px; font-weight: 700; padding: 14px 26px; border-radius: 30px; box-shadow: 0 4px 14px rgba(0,0,0,.5); }
   #dropBtn:active { transform: scale(.96); }
-  #tune { pointer-events: auto; display: none; align-items: center; gap: 10px; background: rgba(0,0,0,.5); padding: 8px 12px; border-radius: 12px; font-size: 12px; }
+  #tune { pointer-events: auto; display: none; flex-direction: column; gap: 8px; background: rgba(0,0,0,.5); padding: 10px 12px; border-radius: 12px; font-size: 12px; }
+  #tune .row { display: flex; align-items: center; gap: 10px; }
   #tune input[type=range] { flex: 1; }
+  #tune span.label { width: 70px; flex: none; }
 
   /* Start gate */
   #gate { position: fixed; inset: 0; z-index: 10; background: #0b1f3a; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 18px; padding: 28px; text-align: center; }
@@ -63,9 +65,9 @@
 
 <div id="bottom">
   <div id="tune">
-    <span>FOV</span>
-    <input type="range" id="fov" min="35" max="90" value="62" step="1">
-    <span id="fovVal">62°</span>
+    <div class="row"><span class="label">FOV</span><input type="range" id="fov" min="35" max="90" value="62" step="1"><span id="fovVal">62°</span></div>
+    <div class="row"><span class="label">Smoothing</span><input type="range" id="smooth" min="1" max="30" value="8" step="1"><span id="smoothVal">8%</span></div>
+    <div class="row"><span class="label">Vert. trim</span><input type="range" id="trim" min="-20" max="20" value="0" step="1"><span id="trimVal">0°</span></div>
   </div>
   <button id="dropBtn">＋ Drop pin on crosshair</button>
 </div>
@@ -74,7 +76,7 @@
 
 <div id="gate">
   <h1>KPF Edge AR — Office Test</h1>
-  <p>Aim the center crosshair at an object (a column, a TV, a window), tap <b>Drop pin</b>, and it sticks there. Pan around to test how well pins track. Hold the phone <b>upright in portrait</b>.</p>
+  <p>3 known buildings load automatically from their real coordinates. Pan around to see if they track cleanly. You can also aim the crosshair at anything else and tap <b>Drop pin</b> to add an ad-hoc test pin. Hold the phone <b>upright in portrait</b>.</p>
   <button id="startBtn">Start camera &amp; sensors</button>
   <p style="font-size:12px;opacity:.6">Requires camera + motion permissions. iPad Wi-Fi models may lack a compass.</p>
 </div>
@@ -84,14 +86,38 @@
   const $ = s => document.querySelector(s);
   const overlay = $('#overlay'), readout = $('#readout'), errBox = $('#err');
 
+  // ---- Known buildings (from Google Maps pin drops) ----
+  // Same coordinates/engine as photo.html. Camera = 11 West 42nd St, ~6th floor (estimated).
+  const OFFICE = { lat: 40.7534, lon: -73.9828 };
+  const BUILDINGS = [
+    { name: "Building 1", lat: 40.752282, lon: -73.982214 },
+    { name: "Building 2", lat: 40.753454, lon: -73.985334 },
+    { name: "Building 3", lat: 40.754673, lon: -73.984757 },
+  ];
+  function bearingDistance(lat1, lon1, lat2, lon2) {
+    const rad = d => d * Math.PI / 180;
+    const phi1 = rad(lat1), phi2 = rad(lat2), dLambda = rad(lon2 - lon1);
+    const y = Math.sin(dLambda) * Math.cos(phi2);
+    const x = Math.cos(phi1) * Math.sin(phi2) - Math.sin(phi1) * Math.cos(phi2) * Math.cos(dLambda);
+    const bearing = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+    const R = 6371000;
+    const dPhi = phi2 - phi1;
+    const a = Math.sin(dPhi/2)**2 + Math.cos(phi1)*Math.cos(phi2)*Math.sin(dLambda/2)**2;
+    return { bearing, dist: 2 * R * Math.asin(Math.sqrt(a)) };
+  }
+
   // ---- State ----
-  let curHeading = null, curPitch = null;   // raw sensor values (degrees)
+  let rawHeading = null, rawPitch = null;    // raw sensor values (degrees), noisy
+  let curHeading = null, curPitch = null;    // low-pass filtered — this is what drives rendering
   let haveHeading = false;
   let fov = 62;                              // horizontal field of view (deg) — tune to match camera
+  let smoothAlpha = 0.08;                    // heading/pitch filter strength (lower = smoother, laggier)
+  let pitchTrim = 0;                         // manual vertical nudge for preloaded pins (deg) — no height data yet
   const pins = [];                           // { id, label, heading, pitch, sx, sy } sx/sy = smoothed screen pos
   let pinCount = 0;
 
   function showErr(msg) { errBox.textContent = msg; errBox.style.display = 'block'; }
+  function angleDiff(a, b) { let d = (a - b + 540) % 360 - 180; return d; }
 
   // ---- Heading/pitch from device orientation ----
   // Normalize to a CLOCKWISE-increasing heading so left/right panning is consistent
@@ -103,21 +129,24 @@
     } else if (typeof e.alpha === 'number' && e.alpha !== null) {
       h = (360 - e.alpha) % 360;                  // Android: convert CCW alpha -> CW heading
     }
-    if (h !== null) { curHeading = h; haveHeading = true; }
+    if (h !== null) {
+      rawHeading = h; haveHeading = true;
+      // Circular low-pass: filter the DIFFERENCE, not the raw value, so it wraps cleanly through 0/360.
+      curHeading = (curHeading === null) ? h : curHeading + angleDiff(h, curHeading) * smoothAlpha;
+    }
     if (typeof e.beta === 'number' && e.beta !== null) {
-      curPitch = e.beta - 90;                     // ~0 at horizon when held upright, + looking up
+      rawPitch = e.beta - 90;                      // ~0 at horizon when held upright, + looking up
+      curPitch = (curPitch === null) ? rawPitch : curPitch + (rawPitch - curPitch) * smoothAlpha;
     }
   }
 
-  // ---- Geometry: place a pin given its anchored heading/pitch vs current view ----
-  function angleDiff(a, b) { let d = (a - b + 540) % 360 - 180; return d; }
-
+  // ---- Geometry: place a pin given its anchored heading/pitch vs current (filtered) view ----
   function project(pin) {
     if (curHeading === null || curPitch === null) return null;
     const W = window.innerWidth, H = window.innerHeight;
     const pxPerDeg = W / fov;                      // angular density (same for both axes)
     const dH = angleDiff(pin.heading, curHeading); // + means pin is clockwise/right of center
-    const dP = pin.pitch - curPitch;               // + means pin is higher than center
+    const dP = (pin.pitch + pitchTrim) - curPitch; // + means pin is higher than center
     const x = W/2 + dH * pxPerDeg;
     const y = H/2 - dP * pxPerDeg;
     return { x, y, dH };
@@ -126,7 +155,7 @@
   // ---- Render loop with screen-space smoothing ----
   const SMOOTH = 0.25;
   function render() {
-    readout.innerHTML = (haveHeading ? `heading ${curHeading.toFixed(0)}°` : 'heading —° (no compass)')
+    readout.innerHTML = (haveHeading ? `heading ${curHeading.toFixed(0)}° <span style="opacity:.6">(raw ${rawHeading.toFixed(0)}°)</span>` : 'heading —° (no compass)')
                       + `<br>pitch ${curPitch===null?'—':curPitch.toFixed(0)}°`;
 
     for (const pin of pins) {
@@ -181,6 +210,16 @@
     const t = $('#tune'); t.style.display = t.style.display === 'flex' ? 'none' : 'flex';
   });
   $('#fov').addEventListener('input', e => { fov = +e.target.value; $('#fovVal').textContent = fov + '°'; });
+  $('#smooth').addEventListener('input', e => { smoothAlpha = (+e.target.value) / 100; $('#smoothVal').textContent = e.target.value + '%'; });
+  $('#trim').addEventListener('input', e => { pitchTrim = +e.target.value; $('#trimVal').textContent = pitchTrim + '°'; });
+
+  function loadKnownBuildings() {
+    for (const b of BUILDINGS) {
+      const { bearing, dist } = bearingDistance(OFFICE.lat, OFFICE.lon, b.lat, b.lon);
+      pinCount++;
+      pins.push({ id: pinCount, label: `${b.name} (${Math.round(dist)}m)`, heading: bearing, pitch: 0, el: null, edge: null });
+    }
+  }
 
   // ---- Startup (must be from a user gesture for iOS permissions) ----
   async function start() {
@@ -207,6 +246,7 @@
     window.addEventListener('deviceorientation', onOrient, true);
 
     $('#gate').style.display = 'none';
+    loadKnownBuildings();
     requestAnimationFrame(render);
 
     setTimeout(() => { if (!haveHeading) showErr('No compass heading detected — this device may lack a magnetometer (common on Wi-Fi iPads). Pins will still drop but won’t track left/right.'); }, 2500);
