@@ -18,10 +18,10 @@
 
   /* Pins */
   .pin { position: fixed; z-index: 3; transform: translate(-50%,-100%); pointer-events: auto; transition: opacity .15s; cursor: pointer; }
-  .pin .label { background: rgba(20,110,220,0.92); border: 1px solid rgba(255,255,255,0.6); padding: 5px 10px; border-radius: 14px; font-size: 14px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
+  .pin .label { background: rgba(0,0,0,0.88); border: 1px solid rgba(255,255,255,0.5); padding: 5px 10px; border-radius: 14px; font-size: 14px; font-weight: 600; white-space: nowrap; box-shadow: 0 2px 8px rgba(0,0,0,.4); }
   .pin .stem { width: 2px; height: 16px; background: rgba(255,255,255,0.8); margin: 0 auto; }
-  .pin .dot  { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid rgba(20,110,220,1); margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,.5); }
-  .pin.has-info .dot::after { content: "i"; display: block; text-align: center; font-size: 10px; font-weight: 800; line-height: 12px; color: rgba(20,110,220,1); font-style: italic; }
+  .pin .dot  { width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid rgba(0,0,0,1); margin: 0 auto; box-shadow: 0 0 6px rgba(0,0,0,.5); }
+  .pin.has-info .dot::after { content: "i"; display: block; text-align: center; font-size: 10px; font-weight: 800; line-height: 12px; color: #000; font-style: italic; }
 
   /* Info card */
   #infoBackdrop { position: fixed; inset: 0; z-index: 8; background: rgba(0,0,0,0.45); display: none; }
@@ -37,7 +37,19 @@
   #infoCard .placeholder-tag { display: inline-block; margin-top: 10px; font-size: 11px; padding: 3px 8px; border-radius: 8px; background: rgba(230,150,20,0.25); color: #ffcf8a; font-weight: 700; }
 
   /* Off-screen edge arrows */
-  .edge { position: fixed; z-index: 3; background: rgba(20,110,220,0.92); border: 1px solid rgba(255,255,255,0.6); padding: 4px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; pointer-events: none; white-space: nowrap; }
+  .edge { position: fixed; z-index: 3; background: rgba(0,0,0,0.88); border: 1px solid rgba(255,255,255,0.5); padding: 4px 8px; border-radius: 10px; font-size: 12px; font-weight: 600; pointer-events: none; white-space: nowrap; }
+
+  /* Landscape guard — pitch math below assumes portrait; landscape geometry is unreliable */
+  #rotateWarn { position: fixed; inset: 0; z-index: 20; background: #0b1f3a; display: none; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 28px; text-align: center; }
+  #rotateWarn .icon { font-size: 40px; }
+  #rotateWarn p { font-size: 14px; opacity: .85; max-width: 300px; line-height: 1.5; }
+
+  /* Calibration panel */
+  #calib { pointer-events: auto; display: none; flex-direction: column; gap: 8px; background: rgba(0,0,0,.6); padding: 10px 12px; border-radius: 12px; font-size: 12px; margin-bottom: 10px; }
+  #calib .hint { opacity: .8; }
+  #calib .row { display: flex; gap: 8px; flex-wrap: wrap; }
+  #calib button { pointer-events: auto; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.4); color: #fff; font-size: 12px; font-weight: 600; padding: 8px 10px; border-radius: 8px; }
+  #calib button:active { background: rgba(255,255,255,0.35); }
 
   /* Top HUD */
   #hud { position: fixed; top: 0; left: 0; right: 0; z-index: 5; padding: 10px 12px; display: flex; gap: 8px; align-items: center; justify-content: space-between; background: linear-gradient(rgba(0,0,0,.55), rgba(0,0,0,0)); }
@@ -72,12 +84,17 @@
 <div id="hud">
   <div class="readout" id="readout">heading —°<br>pitch —°</div>
   <div class="btns">
+    <button class="btn" id="calibBtn">Calibrate</button>
     <button class="btn" id="tuneBtn">FOV</button>
     <button class="btn" id="clearBtn">Clear</button>
   </div>
 </div>
 
 <div id="bottom">
+  <div id="calib">
+    <div class="hint">Aim the crosshair exactly at a known building below, then tap it to correct compass drift:</div>
+    <div class="row" id="calibBtns"></div>
+  </div>
   <div id="tune">
     <div class="row"><span class="label">FOV</span><input type="range" id="fov" min="35" max="90" value="62" step="1"><span id="fovVal">62°</span></div>
     <div class="row"><span class="label">Smoothing</span><input type="range" id="smooth" min="1" max="40" value="18" step="1"><span id="smoothVal">18%</span></div>
@@ -87,6 +104,11 @@
 </div>
 
 <div id="err"></div>
+
+<div id="rotateWarn">
+  <div class="icon">📱</div>
+  <p><b>Rotate to portrait.</b> This prototype's tracking math only works held upright — landscape geometry isn't supported yet.</p>
+</div>
 
 <div id="infoBackdrop"></div>
 <div id="infoCard">
@@ -174,6 +196,8 @@
   let fov = 62;                              // horizontal field of view (deg) — tune to match camera
   let smoothAlpha = 0.18;                    // base filter strength — spike rejection below lets this be more responsive
   let pitchTrim = 0;                         // manual vertical nudge for preloaded pins (deg) — no height data yet
+  let calibrationOffset = 0;                 // deg added to every raw sensor reading, set by tapping a known building below
+  let lastSensorHeading = null;              // most recent UNCALIBRATED reading, used to compute a new offset on calibration
   const pins = [];                           // { id, label, heading, pitch, sx, sy } sx/sy = smoothed screen pos
   let pinCount = 0;
 
@@ -193,23 +217,25 @@
     if (orientSource === null) orientSource = source;
     if (source !== orientSource) return;
 
-    let h = null;
+    let sensorH = null;
     if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
-      h = e.webkitCompassHeading;                 // iOS: clockwise from north
+      sensorH = e.webkitCompassHeading;            // iOS: clockwise from north
     } else if (typeof e.alpha === 'number' && e.alpha !== null) {
-      h = (360 - e.alpha) % 360;                  // Android: convert CCW alpha -> CW heading
+      sensorH = (360 - e.alpha) % 360;             // Android: convert CCW alpha -> CW heading
     }
-    if (h !== null) {
+    if (sensorH !== null) {
+      lastSensorHeading = sensorH;
+      const h = (sensorH + calibrationOffset + 360) % 360;   // apply manual calibration against a known building
       rawHeading = h; haveHeading = true;
       if (curHeading === null) {
         curHeading = h;
       } else {
         let diff = angleDiff(h, curHeading);
         // Reject sudden large jumps (typically magnetic interference from steel framing) —
-        // unless they persist for a few samples in a row, in which case treat it as real motion.
+        // unless they persist for a couple samples in a row, in which case treat it as real motion.
         if (Math.abs(diff) > 25) {
           headingSpikeStreak++;
-          if (headingSpikeStreak < 4) { diff = 0; } else { headingSpikeStreak = 0; }
+          if (headingSpikeStreak < 2) { diff = 0; } else { headingSpikeStreak = 0; }
         } else {
           headingSpikeStreak = 0;
           if (Math.abs(diff) < 0.4) diff = 0;       // deadband: ignore sub-degree sensor noise
@@ -293,6 +319,9 @@
   $('#tuneBtn').addEventListener('click', () => {
     const t = $('#tune'); t.style.display = t.style.display === 'flex' ? 'none' : 'flex';
   });
+  $('#calibBtn').addEventListener('click', () => {
+    const c = $('#calib'); c.style.display = c.style.display === 'flex' ? 'none' : 'flex';
+  });
   $('#fov').addEventListener('input', e => { fov = +e.target.value; $('#fovVal').textContent = fov + '°'; });
   $('#smooth').addEventListener('input', e => { smoothAlpha = (+e.target.value) / 100; $('#smoothVal').textContent = e.target.value + '%'; });
   $('#trim').addEventListener('input', e => { pitchTrim = +e.target.value; $('#trimVal').textContent = pitchTrim + '°'; });
@@ -300,6 +329,7 @@
   function loadKnownBuildings() {
     for (const b of BUILDINGS) {
       const { bearing, dist } = bearingDistance(OFFICE.lat, OFFICE.lon, b.lat, b.lon);
+      b.bearing = bearing; b.dist = dist;           // stash on BUILDINGS too, for the calibration buttons
       pinCount++;
       pins.push({
         id: pinCount, label: `${b.name} (${Math.round(dist)}m)`, name: b.name,
@@ -308,6 +338,31 @@
       });
     }
   }
+
+  // ---- Calibration: tap a known building while the crosshair is exactly on it,
+  // and the current sensor reading is pinned to that building's real (computed) bearing.
+  function buildCalibButtons() {
+    const box = $('#calibBtns');
+    box.innerHTML = '';
+    for (const b of BUILDINGS) {
+      const btn = document.createElement('button');
+      btn.textContent = b.name;
+      btn.addEventListener('click', () => {
+        if (lastSensorHeading === null) { showErr('No sensor data yet.'); return; }
+        calibrationOffset = angleDiff(b.bearing, lastSensorHeading);
+        curHeading = b.bearing;      // snap immediately instead of waiting for the filter to catch up
+        headingSpikeStreak = 0;
+      });
+      box.appendChild(btn);
+    }
+  }
+
+  // ---- Landscape guard ----
+  function checkOrientation() {
+    $('#rotateWarn').style.display = (window.innerWidth > window.innerHeight) ? 'flex' : 'none';
+  }
+  window.addEventListener('resize', checkOrientation);
+  window.addEventListener('orientationchange', checkOrientation);
 
   // ---- Startup (must be from a user gesture for iOS permissions) ----
   async function start() {
@@ -335,6 +390,8 @@
 
     $('#gate').style.display = 'none';
     loadKnownBuildings();
+    buildCalibButtons();
+    checkOrientation();
     requestAnimationFrame(render);
 
     setTimeout(() => { if (!haveHeading) showErr('No compass heading detected — this device may lack a magnetometer (common on Wi-Fi iPads). Pins will still drop but won’t track left/right.'); }, 2500);

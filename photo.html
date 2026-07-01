@@ -10,12 +10,12 @@
   #stage { position:relative; width:100%; max-width:1200px; margin:0 auto; }
   #stage img { width:100%; display:block; }
   .pin { position:absolute; transform:translate(-50%,-100%); touch-action:none; }
-  .pin .label { background:rgba(20,110,220,0.94); border:1px solid rgba(255,255,255,0.6); padding:6px 10px; border-radius:14px; font-size:13px; font-weight:700; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.4); text-align:center; line-height:1.35; }
+  .pin .label { background:rgba(0,0,0,0.88); border:1px solid rgba(255,255,255,0.5); padding:6px 10px; border-radius:14px; font-size:13px; font-weight:700; white-space:nowrap; box-shadow:0 2px 8px rgba(0,0,0,.4); text-align:center; line-height:1.35; }
   .pin .label small { display:block; font-weight:500; opacity:.85; font-size:11px; }
   .pin .stem { width:2px; height:14px; background:rgba(255,255,255,0.85); margin:0 auto; }
-  .pin .dot { width:14px; height:14px; border-radius:50%; background:#fff; border:3px solid rgba(20,110,220,1); margin:0 auto; box-shadow:0 0 6px rgba(0,0,0,.5); }
+  .pin .dot { width:14px; height:14px; border-radius:50%; background:#fff; border:3px solid rgba(0,0,0,1); margin:0 auto; box-shadow:0 0 6px rgba(0,0,0,.5); }
   .pin.dragging .label { background:rgba(230,150,20,0.95); }
-  .pin .dot::after { content:"i"; display:block; text-align:center; font-size:11px; font-weight:800; line-height:14px; color:rgba(20,110,220,1); font-style:italic; }
+  .pin .dot::after { content:"i"; display:block; text-align:center; font-size:11px; font-weight:800; line-height:14px; color:#000; font-style:italic; }
 
   #bar { max-width:1200px; margin:0 auto; padding:14px 16px calc(14px + env(safe-area-inset-bottom)); display:flex; flex-wrap:wrap; gap:10px; align-items:center; justify-content:space-between; }
   #bar h1 { font-size:15px; font-weight:800; }
