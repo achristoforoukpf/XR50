@@ -66,7 +66,7 @@
 <div id="bottom">
   <div id="tune">
     <div class="row"><span class="label">FOV</span><input type="range" id="fov" min="35" max="90" value="62" step="1"><span id="fovVal">62°</span></div>
-    <div class="row"><span class="label">Smoothing</span><input type="range" id="smooth" min="1" max="30" value="8" step="1"><span id="smoothVal">8%</span></div>
+    <div class="row"><span class="label">Smoothing</span><input type="range" id="smooth" min="1" max="40" value="18" step="1"><span id="smoothVal">18%</span></div>
     <div class="row"><span class="label">Vert. trim</span><input type="range" id="trim" min="-20" max="20" value="0" step="1"><span id="trimVal">0°</span></div>
   </div>
   <button id="dropBtn">＋ Drop pin on crosshair</button>
@@ -108,10 +108,10 @@
 
   // ---- State ----
   let rawHeading = null, rawPitch = null;    // raw sensor values (degrees), noisy
-  let curHeading = null, curPitch = null;    // low-pass filtered — this is what drives rendering
+  let curHeading = null, curPitch = null;    // filtered — this is what drives rendering
   let haveHeading = false;
   let fov = 62;                              // horizontal field of view (deg) — tune to match camera
-  let smoothAlpha = 0.08;                    // heading/pitch filter strength (lower = smoother, laggier)
+  let smoothAlpha = 0.18;                    // base filter strength — spike rejection below lets this be more responsive
   let pitchTrim = 0;                         // manual vertical nudge for preloaded pins (deg) — no height data yet
   const pins = [];                           // { id, label, heading, pitch, sx, sy } sx/sy = smoothed screen pos
   let pinCount = 0;
@@ -122,7 +122,16 @@
   // ---- Heading/pitch from device orientation ----
   // Normalize to a CLOCKWISE-increasing heading so left/right panning is consistent
   // across iOS (webkitCompassHeading) and Android (alpha).
-  function onOrient(e) {
+  // Prefer whichever event source fires first, then stick with it — some Android
+  // browsers fire BOTH deviceorientationabsolute and deviceorientation concurrently
+  // with slightly different readings, and alternating between them causes visible jitter.
+  let orientSource = null;
+  let headingSpikeStreak = 0;
+
+  function onOrient(e, source) {
+    if (orientSource === null) orientSource = source;
+    if (source !== orientSource) return;
+
     let h = null;
     if (typeof e.webkitCompassHeading === 'number' && !isNaN(e.webkitCompassHeading)) {
       h = e.webkitCompassHeading;                 // iOS: clockwise from north
@@ -131,8 +140,21 @@
     }
     if (h !== null) {
       rawHeading = h; haveHeading = true;
-      // Circular low-pass: filter the DIFFERENCE, not the raw value, so it wraps cleanly through 0/360.
-      curHeading = (curHeading === null) ? h : curHeading + angleDiff(h, curHeading) * smoothAlpha;
+      if (curHeading === null) {
+        curHeading = h;
+      } else {
+        let diff = angleDiff(h, curHeading);
+        // Reject sudden large jumps (typically magnetic interference from steel framing) —
+        // unless they persist for a few samples in a row, in which case treat it as real motion.
+        if (Math.abs(diff) > 25) {
+          headingSpikeStreak++;
+          if (headingSpikeStreak < 4) { diff = 0; } else { headingSpikeStreak = 0; }
+        } else {
+          headingSpikeStreak = 0;
+          if (Math.abs(diff) < 0.4) diff = 0;       // deadband: ignore sub-degree sensor noise
+        }
+        curHeading += diff * smoothAlpha;
+      }
     }
     if (typeof e.beta === 'number' && e.beta !== null) {
       rawPitch = e.beta - 90;                      // ~0 at horizon when held upright, + looking up
@@ -153,7 +175,7 @@
   }
 
   // ---- Render loop with screen-space smoothing ----
-  const SMOOTH = 0.25;
+  const SMOOTH = 0.5; // heading is already filtered upstream; this just irons out sub-pixel rounding
   function render() {
     readout.innerHTML = (haveHeading ? `heading ${curHeading.toFixed(0)}° <span style="opacity:.6">(raw ${rawHeading.toFixed(0)}°)</span>` : 'heading —° (no compass)')
                       + `<br>pitch ${curPitch===null?'—':curPitch.toFixed(0)}°`;
@@ -242,8 +264,8 @@
       }
     } catch (e) { /* non-iOS */ }
 
-    window.addEventListener('deviceorientationabsolute', onOrient, true);
-    window.addEventListener('deviceorientation', onOrient, true);
+    window.addEventListener('deviceorientationabsolute', e => onOrient(e, 'absolute'), true);
+    window.addEventListener('deviceorientation', e => onOrient(e, 'plain'), true);
 
     $('#gate').style.display = 'none';
     loadKnownBuildings();
