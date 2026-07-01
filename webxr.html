@@ -11,12 +11,18 @@
   #version { position:fixed; top:calc(14px + env(safe-area-inset-top)); left:0; right:0; text-align:center; font-size:13px; font-weight:700; letter-spacing:.5px; color:#4da3ff; z-index:30; }
 
   /* Start gate */
-  #gate { position:fixed; inset:0; z-index:20; background:#000; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:18px; padding:28px; text-align:center; }
-  #gate h1 { font-size:22px; font-weight:800; }
-  #gate p { font-size:14px; opacity:.85; max-width:330px; line-height:1.5; }
-  #enterBtn { background:#fff; color:#000; font-size:17px; font-weight:800; padding:16px 32px; border-radius:30px; border:none; }
+  #gate { position:fixed; inset:0; z-index:20; background:linear-gradient(180deg,#061225 0%,#0c2748 52%,#18426f 100%); display:flex; flex-direction:column; align-items:center; justify-content:center; gap:16px; padding:28px; text-align:center; overflow:hidden; }
+  /* Optional: drop a cover.jpg in the repo to use a real photo instead of the illustration */
+  #coverPhoto { position:absolute; inset:0; z-index:0; background:center/cover no-repeat; opacity:0; pointer-events:none; }
+  #cover { position:absolute; left:0; right:0; bottom:0; width:100%; z-index:0; pointer-events:none; }
+  #cover svg { display:block; width:100%; height:auto; }
+  #gate > *:not(#cover):not(#coverPhoto) { position:relative; z-index:1; }
+  #gate h1 { font-size:23px; font-weight:800; text-shadow:0 2px 12px rgba(0,0,0,.6); }
+  #gate p { font-size:14px; opacity:.9; max-width:330px; line-height:1.5; text-shadow:0 1px 6px rgba(0,0,0,.6); }
+  #enterBtn { background:#fff; color:#0c2748; font-size:17px; font-weight:800; padding:16px 32px; border-radius:30px; border:none; box-shadow:0 6px 20px rgba(0,0,0,.4); }
   #enterBtn:disabled { opacity:.4; }
-  #unsupported { display:none; background:rgba(180,60,20,.9); padding:12px 14px; border-radius:12px; font-size:13px; max-width:330px; line-height:1.45; }
+  #unsupported { display:none; background:rgba(180,60,20,.92); padding:12px 14px; border-radius:12px; font-size:13px; max-width:330px; line-height:1.45; }
+  #credit { position:absolute; bottom:calc(10px + env(safe-area-inset-bottom)); left:0; right:0; z-index:2; font-size:11px; opacity:.65; letter-spacing:.3px; }
 
   /* DOM overlay (drawn over the AR camera feed) */
   #overlay { position:fixed; inset:0; z-index:10; display:none; }
@@ -46,14 +52,57 @@
 </head>
 <body>
 
-<div id="version">v1.4 · WebXR steady</div>
+<div id="version">v1.5 · cover art</div>
 
 <div id="gate">
+  <div id="coverPhoto"></div>
+  <div id="cover">
+    <svg viewBox="0 0 400 300" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <defs>
+        <linearGradient id="towerG" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#12325a"/>
+          <stop offset="1" stop-color="#050f22"/>
+        </linearGradient>
+        <linearGradient id="glow" x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0" stop-color="#5aa6ff" stop-opacity=".5"/>
+          <stop offset="1" stop-color="#5aa6ff" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <!-- soft halo behind the hero tower -->
+      <ellipse cx="196" cy="70" rx="90" ry="120" fill="url(#glow)"/>
+      <!-- neighbouring skyline (deep silhouette) -->
+      <g fill="#07142b">
+        <rect x="0"   y="200" width="46" height="100"/>
+        <rect x="44"  y="150" width="30" height="150"/>
+        <rect x="72"  y="176" width="26" height="124"/>
+        <rect x="96"  y="140" width="22" height="160"/>
+        <rect x="250" y="132" width="30" height="168"/>
+        <rect x="278" y="180" width="34" height="120"/>
+        <rect x="310" y="150" width="30" height="150"/>
+        <rect x="338" y="116" width="30" height="184"/>
+        <rect x="366" y="170" width="40" height="130"/>
+      </g>
+      <!-- One Vanderbilt–inspired hero tower: tapering setbacks + angled crown -->
+      <polygon points="150,300 150,150 162,150 162,96 174,96 174,52 196,20 202,52 202,104 214,104 214,158 226,158 226,300"
+               fill="url(#towerG)"/>
+      <line x1="196" y1="20" x2="196" y2="6" stroke="#12325a" stroke-width="2"/>
+      <!-- scattered lit windows -->
+      <g fill="#ffd98a" opacity=".85">
+        <rect x="158" y="170" width="3" height="4"/><rect x="166" y="188" width="3" height="4"/>
+        <rect x="184" y="120" width="3" height="4"/><rect x="192" y="150" width="3" height="4"/>
+        <rect x="205" y="130" width="3" height="4"/><rect x="210" y="176" width="3" height="4"/>
+        <rect x="18" y="224" width="3" height="4"/><rect x="52" y="176" width="3" height="4"/>
+        <rect x="258" y="160" width="3" height="4"/><rect x="345" y="150" width="3" height="4"/>
+        <rect x="380" y="196" width="3" height="4"/>
+      </g>
+    </svg>
+  </div>
   <h1>KPF Edge AR — WebXR</h1>
   <p>Real visual tracking (Chrome + ARCore). Labels are <b>predefined</b> — you align once by aiming at a building you recognize and tapping it, and all labels snap into place and stay welded.</p>
   <button id="enterBtn" disabled>Checking device…</button>
   <div id="unsupported">This device/browser doesn't support WebXR AR. Open this page in <b>Chrome on an Android phone</b>. (iPhones/iPads need the native app — Safari has no WebXR.)</div>
   <p style="font-size:12px;opacity:.6">After entering: slowly move the phone a moment so tracking initializes, aim the crosshair at a building you can identify, and tap its <b>Align</b> button.</p>
+  <div id="credit">Illustration — One Vanderbilt (KPF). Swap in an official photo via cover.jpg.</div>
 </div>
 
 <div id="overlay">
@@ -74,6 +123,19 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 const $ = s => document.querySelector(s);
+
+// If a cover.jpg exists in the repo, fade it in over the illustration (real photo override).
+(() => {
+  const img = new Image();
+  img.onload = () => {
+    const ph = $('#coverPhoto');
+    ph.style.backgroundImage = `url(cover.jpg)`;
+    ph.style.opacity = '1';
+    $('#cover').style.display = 'none';
+    $('#credit').textContent = 'One Vanderbilt · KPF';
+  };
+  img.src = 'cover.jpg';
+})();
 
 // ---- Buildings (names + placeholder info; in WebXR we place by aim, not coordinates) ----
 const BLURBS = [
