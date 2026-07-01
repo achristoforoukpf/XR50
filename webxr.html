@@ -55,7 +55,7 @@
 </head>
 <body>
 
-<div id="version">v1.9 · iOS via Variant Launch</div>
+<div id="version">v2.0 · iOS enter-AR debug</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -334,48 +334,54 @@ async function init() {
 }
 
 async function enterAR() {
-  scene = new THREE.Scene();
-  camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.05, 1000);
-  renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
-  renderer.setPixelRatio(devicePixelRatio);
-  renderer.setSize(innerWidth, innerHeight);
-  renderer.xr.enabled = true;
-  renderer.xr.setReferenceSpaceType('local');   // Variant Launch (iOS) supports 'local', not 'local-floor'
-  document.body.appendChild(renderer.domElement);
-  renderer.domElement.style.position = 'fixed';
-  renderer.domElement.style.inset = '0';
-  renderer.domElement.style.zIndex = '1';
-
-  scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
-
+  $('#enterBtn').textContent = 'Starting…';
   try {
+    scene = new THREE.Scene();
+    camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.05, 1000);
+    renderer = new THREE.WebGLRenderer({ antialias:true, alpha:true });
+    renderer.setPixelRatio(devicePixelRatio);
+    renderer.setSize(innerWidth, innerHeight);
+    renderer.xr.enabled = true;
+    renderer.xr.setReferenceSpaceType('local');   // Variant Launch (iOS) supports 'local', not 'local-floor'
+    document.body.appendChild(renderer.domElement);
+    renderer.domElement.style.position = 'fixed';
+    renderer.domElement.style.inset = '0';
+    renderer.domElement.style.zIndex = '1';
+
+    scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
+
     xrSession = await navigator.xr.requestSession('immersive-ar', {
       optionalFeatures: ['dom-overlay'],
       domOverlay: { root: $('#overlay') },
     });
+
+    // A tap anywhere in the AR view fires 'select'
+    const controller = renderer.xr.getController(0);
+    controller.addEventListener('select', onSelect);
+    scene.add(controller);
+
+    xrSession.addEventListener('end', () => {
+      $('#overlay').style.display = 'none';
+      $('#gate').style.display = 'flex';
+      $('#enterBtn').textContent = 'Enter AR';
+      if (renderer.domElement.parentNode) renderer.domElement.remove();
+    });
+
+    $('#exitBtn').onclick = () => xrSession.end();
+
+    await renderer.xr.setSession(xrSession);
+
+    $('#gate').style.display = 'none';
+    $('#overlay').style.display = 'block';
+    renderer.setAnimationLoop(render);
   } catch (e) {
-    setStatus('Could not start AR: ' + e.message);
-    return;
-  }
-
-  $('#gate').style.display = 'none';
-  $('#overlay').style.display = 'block';
-
-  // A tap anywhere in the AR view fires 'select'
-  const controller = renderer.xr.getController(0);
-  controller.addEventListener('select', onSelect);
-  scene.add(controller);
-
-  xrSession.addEventListener('end', () => {
-    $('#overlay').style.display = 'none';
+    // Surface the REAL reason (was previously written to a hidden element / thrown silently).
+    alert('AR failed to start:\n\n' + (e && e.message ? e.message : String(e)));
+    $('#enterBtn').textContent = 'Enter AR — retry';
     $('#gate').style.display = 'flex';
-    if (renderer.domElement.parentNode) renderer.domElement.remove();
-  });
-
-  $('#exitBtn').onclick = () => xrSession.end();
-
-  await renderer.xr.setSession(xrSession);
-  renderer.setAnimationLoop(render);
+    $('#overlay').style.display = 'none';
+    if (renderer && renderer.domElement && renderer.domElement.parentNode) renderer.domElement.remove();
+  }
 }
 
 function render() {
