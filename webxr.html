@@ -67,7 +67,7 @@
 </head>
 <body>
 
-<div id="version">v2.8 · polish pass</div>
+<div id="version">v2.9 · no mirror + landscape</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -279,13 +279,8 @@ BUILDINGS.forEach(b => {
   btn.addEventListener('click', (e)=> { e.stopPropagation(); alignOn(b); });
   btnBox.appendChild(btn);
 });
-// Mirror toggle — if left/right ends up flipped, one tap corrects it (re-align after).
-const flip = document.createElement('button');
-flip.className = 'alignbtn';
-flip.textContent = '⇄︎ Mirror';
-flip.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
-flip.addEventListener('click', (e)=> { e.stopPropagation(); dirSign = -dirSign; setStatus('Mirror flipped — re-tap an Align button.'); });
-btnBox.appendChild(flip);
+// (Mirror toggle removed from the UI. To re-enable a left/right flip if a device ever mirrors,
+//  set `dirSign = -1` — the placement math still honors it.)
 // Re-align chip — shown after alignment; tap to bring the align buttons back.
 const reAlign = document.createElement('button');
 reAlign.id = 'reAlignChip';
@@ -364,6 +359,15 @@ async function enterAR() {
     renderer.domElement.style.zIndex = '1';
 
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
+
+    // Keep renderer + camera in sync when the device rotates (portrait <-> landscape).
+    const onResize = () => {
+      camera.aspect = innerWidth / innerHeight;
+      camera.updateProjectionMatrix();
+      renderer.setSize(innerWidth, innerHeight);
+    };
+    window.addEventListener('resize', onResize);
+    window.addEventListener('orientationchange', onResize);
 
     xrSession = await navigator.xr.requestSession('immersive-ar', {
       requiredFeatures: ['local'],              // Variant Launch's polyfill reads this array; omitting it crashes on iOS
