@@ -52,7 +52,7 @@
 </head>
 <body>
 
-<div id="version">v1.7 · device detection</div>
+<div id="version">v1.8 · dimmed cover</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -130,7 +130,7 @@ const $ = s => document.querySelector(s);
   img.onload = () => {
     const ph = $('#coverPhoto');
     ph.style.backgroundImage = `url(cover.jpg)`;
-    ph.style.opacity = '1';
+    ph.style.opacity = '0.5';   // fade over the dark gate gradient so white text stays readable
     $('#cover').style.display = 'none';
     $('#credit').textContent = 'One Vanderbilt · KPF';
   };
