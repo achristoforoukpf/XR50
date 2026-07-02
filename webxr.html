@@ -53,6 +53,14 @@
 
   #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
+  /* Alignment guide — shows where on the anchor building to aim before tapping Align. */
+  #alignGuide { position:fixed; left:12px; top:calc(68px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
+  #alignGuide svg { display:block; width:100%; height:auto; }
+  #alignGuide p { font-size:11px; line-height:1.35; color:#fff; opacity:.92; margin-top:6px; }
+  #alignGuide .close { position:absolute; top:2px; right:6px; background:none; border:none; color:#fff; opacity:.6; font-size:16px; padding:4px; }
+  #guideChip { display:none; }
+  #placeBtns.collapsed #guideChip { display:block; }
+
   /* Info card — KPF brand styling: white, navy headings, wide-tracked uppercase meta labels */
   #infoCard { position:fixed; left:0; right:0; bottom:0; z-index:12; background:var(--kpf-paper); border-radius:14px 14px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .25s ease; box-shadow:0 -8px 30px rgba(0,0,0,.35); }
   #infoCard.open { transform:translateY(0); }
@@ -67,7 +75,7 @@
 </head>
 <body>
 
-<div id="version">v2.9 · no mirror + landscape</div>
+<div id="version">v3.0 · alignment guide</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -124,6 +132,22 @@
   <div id="crosshair"></div>
   <div id="status">Move the phone slowly to start tracking, then aim at a building and tap its Align button…</div>
   <button id="exitBtn">Exit AR</button>
+
+  <div id="alignGuide">
+    <button class="close" id="alignGuideClose">&times;</button>
+    <svg viewBox="0 0 120 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="12" y="120" width="96" height="42" fill="#3a4f74"/>
+      <rect x="28" y="82"  width="64" height="38" fill="#33456a"/>
+      <rect x="44" y="46"  width="32" height="36" fill="#2c3c5f"/>
+      <line x1="60" y1="46" x2="60" y2="14" stroke="#2c3c5f" stroke-width="4"/>
+      <line x1="60" y1="14" x2="60" y2="4"  stroke="#2c3c5f" stroke-width="2"/>
+      <circle cx="60" cy="46" r="7" fill="none" stroke="#ff4d4d" stroke-width="2.5"/>
+      <circle cx="60" cy="46" r="2.2" fill="#ff4d4d"/>
+      <text x="72" y="49" fill="#ff8a8a" font-size="12" font-weight="700" font-family="sans-serif">C</text>
+    </svg>
+    <p>Aim the crosshair at the corner where the stepped roofline meets the base of the spire — then tap Align.</p>
+  </div>
+
   <div id="placeBtns"></div>
   <div id="infoCard">
     <button class="close" id="infoClose">&times;</button>
@@ -216,6 +240,7 @@ function alignOn(ref) {
   aligned = true;
   setStatus(`Aligned on ${ref.name}. Pan around — all labels are placed and welded. Tap one for info.`);
   $('#placeBtns').classList.add('collapsed');                             // tuck the align buttons into a Re-align chip
+  hideAlignGuide();
 }
 
 function setStatus(t){ $('#status').textContent = t; }
@@ -286,8 +311,21 @@ const reAlign = document.createElement('button');
 reAlign.id = 'reAlignChip';
 reAlign.textContent = 'Re-align';
 reAlign.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
-reAlign.addEventListener('click', (e)=> { e.stopPropagation(); btnBox.classList.remove('collapsed'); setStatus('Aim at a building you recognize and tap its Align button.'); });
+reAlign.addEventListener('click', (e)=> { e.stopPropagation(); btnBox.classList.remove('collapsed'); setStatus('Aim at a building you recognize and tap its Align button.'); showAlignGuide(); });
 btnBox.appendChild(reAlign);
+
+// Guide chip — reopen the alignment diagram after it's been closed or tucked away post-align.
+const guideChip = document.createElement('button');
+guideChip.id = 'guideChip';
+guideChip.textContent = 'Guide';
+guideChip.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
+guideChip.addEventListener('click', (e)=> { e.stopPropagation(); showAlignGuide(); });
+btnBox.appendChild(guideChip);
+
+function showAlignGuide(){ $('#alignGuide').style.display = 'block'; }
+function hideAlignGuide(){ $('#alignGuide').style.display = 'none'; }
+$('#alignGuideClose').addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
+$('#alignGuideClose').addEventListener('click', (e)=> { e.stopPropagation(); hideAlignGuide(); });
 
 // ---- WebXR setup ----
 // ---- Device detection ----
