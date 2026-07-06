@@ -37,10 +37,14 @@
 
   /* DOM overlay (drawn over the AR camera feed) */
   #overlay { position:fixed; inset:0; z-index:10; display:none; }
-  .arrow { position:fixed; z-index:11; transform:translate(-50%,-50%); background:rgba(10,30,66,0.82); border:1px solid rgba(255,255,255,0.5); color:#fff; font-size:12px; font-weight:600; padding:5px 9px; border-radius:14px; white-space:nowrap; pointer-events:none; display:none; box-shadow:0 2px 8px rgba(0,0,0,.4); }
+  /* Off-screen indicator: a small icon-only chevron dot — no name text, to stay out of the way when
+     many buildings are off-screen at once. */
+  .arrow { position:fixed; z-index:11; width:26px; height:26px; transform:translate(-50%,-50%); background:rgba(10,30,66,0.75); border:1px solid rgba(255,255,255,0.5); color:#fff; font-size:13px; display:none; align-items:center; justify-content:center; border-radius:50%; pointer-events:none; box-shadow:0 2px 6px rgba(0,0,0,.35); transition:opacity .4s ease; }
   /* Welded labels are DOM (crisp on all devices — the 3D canvas texture was blurred by iOS's reduced-res WebGL layer) */
-  /* Pin label: a map-pin with the project photo nested in the head, tail pointing at the building. */
-  .arlabel { position:fixed; z-index:11; width:60px; transform:translate(-50%,-100%); pointer-events:auto; display:none; filter:drop-shadow(0 3px 8px rgba(0,0,0,.5)); }
+  /* Pin label: a map-pin with the project photo nested in the head, tail pointing at the building.
+     opacity/transform transition here drives the "reaching full opacity" fade-in as pins come into view
+     or into focus — the render loop just sets target values each frame, the browser eases between them. */
+  .arlabel { position:fixed; z-index:11; width:60px; transform:translate(-50%,-100%) scale(0.85); pointer-events:auto; display:none; opacity:0; filter:drop-shadow(0 3px 8px rgba(0,0,0,.5)); transition:opacity .5s ease, transform .4s ease; }
   .arlabel .pinHead { position:relative; width:60px; height:60px; border-radius:50%; background:rgba(10,30,66,0.9); border:3px solid #fff; overflow:hidden; }
   .arlabel .pinPhoto { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
   .arlabel .pinPhoto.placeholder { display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.55); font-size:22px; }
@@ -94,7 +98,7 @@
 </head>
 <body>
 
-<div id="version">v3.4 · discovery + real photos</div>
+<div id="version">v3.5 · pin collisions + sleeker UI</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -320,14 +324,15 @@ function dirFromYaw(yaw, elevRad) {
 
 // Align on one recognizable building: aim the crosshair at it, tap its button. Its real bearing
 // becomes the anchor; every other label is placed at its own bearing offset from that.
+const PIN_ELEV = 5 * Math.PI / 180;   // pins hover at a fixed elevation above the skyline, not at each building's real bearing height
+
 function alignOn(ref) {
   if (camForward.lengthSq() === 0) { setStatus('Tracking not ready — move the phone a moment.'); return; }
   const refYaw = Math.atan2(camForward.x, -camForward.z);   // session yaw the user is aiming at
 
   for (const b of BUILDINGS) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
-    b.dir = dirFromYaw(refYaw + dTheta, 0).normalize();                   // fixed DIRECTION (behaves like infinity)
-    b.appear = 0;                                                          // restart fade-in animation
+    b.dir = dirFromYaw(refYaw + dTheta, b.anchorOnly ? 0 : PIN_ELEV).normalize();   // fixed DIRECTION (behaves like infinity)
   }
   aligned = true;
   setStatus(`Aligned on ${ref.name}. Pan around — all labels are placed and welded. Tap one for info.`);
@@ -394,7 +399,11 @@ function onSelect(){
 const btnBox = $('#placeBtns');
 function rebuildAlignButtons(){
   btnBox.innerHTML = '';
-  BUILDINGS.forEach(b => {
+  // Edge Mode has one true anchor (ESB) — every other building falls in from its own known bearing
+  // once that's set, so it doesn't get its own Align button. Office Mode keeps all buildings
+  // alignable since none of them is a fixed "the" anchor for quick desk testing.
+  const alignable = MODE === 'edge' ? BUILDINGS.filter(b => b.anchorOnly) : BUILDINGS;
+  alignable.forEach(b => {
     const btn = document.createElement('button');
     btn.className = 'alignbtn';
     btn.textContent = 'Align: ' + b.name;
@@ -593,6 +602,7 @@ function render() {
     const W = innerWidth, H = innerHeight, cx = W/2, cy = H/2, mx = cx - 48, my = cy - 72;
 
     const onList = [];
+    const offList = [];
     for (const b of BUILDINGS) {
       if (!b.dir || b.anchorOnly) continue;   // anchor-only entries (e.g. ESB) never get a pin
       // Lazily create the DOM pin + edge arrow for this building.
@@ -606,42 +616,66 @@ function render() {
         $('#overlay').appendChild(b.labelEl);
       }
       if (!b.arrowEl) { b.arrowEl = document.createElement('div'); b.arrowEl.className = 'arrow'; $('#overlay').appendChild(b.arrowEl); }
-      if (b.appear === undefined) b.appear = 0;
-      b.appear = Math.min(1, b.appear + 0.05);        // fade-in ramp (~0.35s)
 
       // Opacity: dim far buildings, brighten the one you're aiming toward ("approach" = look at it).
+      // No manual fade-in ramp here — the CSS transition on .arlabel eases every opacity/transform
+      // change we set below, which naturally animates the "reaching full opacity" effect as pins
+      // come on-screen or into focus while panning.
       const distOp = clamp(1 - (b.dist - 200) / (1500 - 200), 0.25, 1);
       const fwd = b.dir.dot(camForward), right = b.dir.dot(camRight), up = b.dir.dot(camUp);
       const focus = clamp((fwd - Math.cos(20*Math.PI/180)) / (Math.cos(6*Math.PI/180) - Math.cos(20*Math.PI/180)), 0, 1);
-      const op = (distOp + (1 - distOp) * focus) * b.appear;
+      const op = distOp + (1 - distOp) * focus;
 
       const ndcX = fwd > 0 ? (right/fwd)/tanH : 99, ndcY = fwd > 0 ? (up/fwd)/tanV : 99;
       const onScreen = fwd > 0 && Math.abs(ndcX) <= 1 && Math.abs(ndcY) <= 1;
 
       if (onScreen) {
-        b.arrowEl.style.display = 'none';
+        b.arrowEl.style.opacity = '0';
         onList.push({ b, x: cx + ndcX * cx, y: cy - ndcY * cy, op });
       } else {
-        b.labelEl.style.display = 'none';
+        b.labelEl.style.opacity = '0';
         // Point an edge indicator toward the off-screen label.
         let dx = fwd > 0.02 ? ndcX : right, dy = fwd > 0.02 ? ndcY : up;
         let sdx = dx, sdy = -dy;                       // screen y is down
         const L = Math.hypot(sdx, sdy) || 1; sdx /= L; sdy /= L;
         const t = Math.min(Math.abs(sdx) < 1e-3 ? 1e9 : mx/Math.abs(sdx), Math.abs(sdy) < 1e-3 ? 1e9 : my/Math.abs(sdy));
-        b.arrowEl.style.left = (cx + sdx*t) + 'px';
-        b.arrowEl.style.top  = (cy + sdy*t) + 'px';
-        b.arrowEl.textContent = chevron(sdx, sdy) + ' ' + b.name;
-        b.arrowEl.style.display = 'block';
+        offList.push({ b, x: cx + sdx*t, y: cy + sdy*t, dir: chevron(sdx, sdy), op });
       }
     }
 
-    // Collision avoidance: nudge labels that are close horizontally apart vertically so they don't overlap.
+    // Collision avoidance for on-screen pins: stack overlapping ones with a fan-out so they read as
+    // a cluster rather than a straight overlapping column (which is what made closing one card
+    // seem to "reveal" another pin underneath it).
     onList.sort((a, b) => a.y - b.y);
-    const GAP = 40, XNEAR = 150;
-    for (let i = 1; i < onList.length; i++)
-      for (let j = 0; j < i; j++)
-        if (Math.abs(onList[i].x - onList[j].x) < XNEAR && onList[i].y - onList[j].y < GAP)
+    const GAP = 100, XNEAR = 170;
+    for (let i = 1; i < onList.length; i++) {
+      let bumps = 0;
+      for (let j = 0; j < i; j++) {
+        if (Math.abs(onList[i].x - onList[j].x) < XNEAR && onList[i].y - onList[j].y < GAP) {
           onList[i].y = onList[j].y + GAP;
+          bumps++;
+        }
+      }
+      if (bumps) onList[i].x += (bumps % 2 === 0 ? 1 : -1) * 20 * Math.ceil(bumps / 2);
+    }
+
+    // Same idea for off-screen edge indicators — several buildings sharing a similar off-screen
+    // direction would otherwise land right on top of each other.
+    offList.sort((a, b) => a.y - b.y);
+    const AGAP = 30, ANEAR = 130;
+    for (let i = 1; i < offList.length; i++)
+      for (let j = 0; j < i; j++)
+        if (Math.abs(offList[i].x - offList[j].x) < ANEAR && offList[i].y - offList[j].y < AGAP)
+          offList[i].y = offList[j].y + AGAP;
+
+    for (const it of offList) {
+      const el = it.b.arrowEl;
+      el.style.left = it.x + 'px';
+      el.style.top = it.y + 'px';
+      el.style.opacity = it.op.toFixed(3);
+      el.style.display = 'flex';
+      el.textContent = it.dir;
+    }
 
     for (const it of onList) {
       const el = it.b.labelEl;
@@ -650,8 +684,7 @@ function render() {
       el.style.top = it.y + 'px';
       const seenFade = el.classList.contains('discovered') ? 0.55 : 1;   // slight fade once you've opened its card
       el.style.opacity = (it.op * seenFade).toFixed(3);
-      const s = 0.92 + 0.08 * it.b.appear;             // subtle scale-in with the fade
-      el.style.transform = `translate(-50%,-100%) scale(${s.toFixed(3)})`;   // pin tip anchors the point, not its center
+      el.style.transform = 'translate(-50%,-100%) scale(1)';   // pin tip anchors the point, not its center; CSS eases the pop-in from the 0.85 default
     }
   }
   renderer.render(scene, camera);
