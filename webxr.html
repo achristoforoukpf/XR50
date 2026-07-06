@@ -134,7 +134,7 @@
   #infoCard.open { transform:translateY(0); }
   #infoCard .close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; z-index:1; }
   #infoCard .infoPhoto { width:100%; height:160px; border-radius:10px; margin-bottom:16px; overflow:hidden; background:#e3ded2; display:flex; align-items:center; justify-content:center; }
-  #infoCard .infoPhoto img { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+  #infoCard .infoPhoto img { width:100%; height:100%; object-fit:contain; object-position:center; display:block; }
   #infoCard .infoPhoto .placeholder { color:var(--kpf-meta); font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
   #infoCard h2 { color:var(--kpf-navy); font-size:24px; font-weight:700; letter-spacing:-.01em; margin-bottom:16px; padding-right:30px; }
   #infoCard .fields { display:grid; grid-template-columns:auto 1fr; gap:10px 18px; font-size:14px; margin:0 0 16px; }
@@ -162,7 +162,7 @@
 </head>
 <body>
 
-<div id="version">v5.5 · real heights/years, 50th anniversary badge</div>
+<div id="version">v5.6 · drop Architect field, uncropped info photo</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -312,7 +312,7 @@ function bearingDistance(lat1, lon1, lat2, lon2) {
 
 // ---- The real KPF projects, viewed from the Edge observation deck ----
 const ANCHOR = { lat: 40.75393935378195, lon: -74.00076274465533 };
-function edgeInfo(desc, year, height){ return { architect:"Kohn Pedersen Fox", year: year || "TBD", height: height || "—", desc: desc || "Description pending." }; }
+function edgeInfo(desc, year, height){ return { year: year || "TBD", height: height || "—", desc: desc || "Description pending." }; }
 const BUILDINGS = [
   { name:"Empire State Building", lat:40.748817, lon:-73.985428, anchorOnly:true },
   { name:"One Vanderbilt", lat:40.7528, lon:-73.9792, photo:"photos/one-vanderbilt.jpg", pos:"38% 32%",
@@ -478,10 +478,9 @@ function closeInfoCard(){ $('#infoCard').classList.remove('open'); $('#infoScrim
 function showInfo(b){
   $('#infoName').textContent = b.name;
   $('#infoPhoto').innerHTML = b.photo
-    ? `<img src="${b.photo}" alt="${b.name}" style="object-position:${b.pos || 'center'}">`
+    ? `<img src="${b.photo}" alt="${b.name}">`
     : `<span class="placeholder">No photo yet</span>`;
-  $('#infoFields').innerHTML = `<dt>Architect</dt><dd>${b.info.architect}</dd>
-    <dt>Completed</dt><dd>${b.info.year}</dd><dt>Height</dt><dd>${b.info.height}</dd>`;
+  $('#infoFields').innerHTML = `<dt>Completed</dt><dd>${b.info.year}</dd><dt>Height</dt><dd>${b.info.height}</dd>`;
   $('#infoDesc').textContent = b.info.desc;
   // Only flag it as pending when it genuinely is — most cards now have real photos/descriptions,
   // so a blanket "placeholder demo data" tag on every card was no longer accurate.
