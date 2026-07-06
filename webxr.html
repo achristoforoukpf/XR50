@@ -135,7 +135,7 @@
 </head>
 <body>
 
-<div id="version">v4.4 · Step 2 mentions tapping pins</div>
+<div id="version">v4.5 · fix stuck-on-Starting timeout</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -569,7 +569,9 @@ async function init() {
   // Variant Launch provides WebXR on iOS via App Clip. Give it a moment to polyfill navigator.xr
   // before we test support (its script loads in <head>). On iOS in plain Safari it will present
   // its launch flow; inside the Launch viewer, immersive-ar becomes supported.
-  const supported = navigator.xr && await navigator.xr.isSessionSupported('immersive-ar').catch(()=>false);
+  const supported = navigator.xr && await withTimeout(
+    navigator.xr.isSessionSupported('immersive-ar'), 10000, 'timed out'
+  ).catch(()=>false);
   if (supported) {
     $('#enterBtn').disabled = false;
     $('#enterBtn').textContent = 'Enter AR';
@@ -597,8 +599,22 @@ async function init() {
   }
 }
 
+// requestSession() can hang forever inside Variant Launch's iOS viewer (e.g. a dismissed permission
+// prompt or a stalled App Clip bridge) with no rejection at all, leaving the button stuck on
+// "Starting…" with no way to recover short of force-closing. Race it against a timeout so a hang
+// surfaces the existing retry UI instead.
+function withTimeout(promise, ms, message){
+  return Promise.race([
+    promise,
+    new Promise((_, reject) => setTimeout(() => reject(new Error(message)), ms)),
+  ]);
+}
+
 async function enterAR() {
   $('#enterBtn').textContent = 'Starting…';
+  const reassureTimer = setTimeout(() => {
+    $('#enterBtn').textContent = 'Still starting… (waiting on camera/AR permission)';
+  }, 6000);
   // Best-effort — most WebXR immersive-ar implementations (including Variant Launch's iOS viewer)
   // lock the camera-passthrough + dom-overlay compositor to whatever orientation the session
   // started in and don't support rotating mid-session at all, so we commit to portrait rather than
@@ -632,11 +648,18 @@ async function enterAR() {
     window.addEventListener('resize', onResize);
     window.addEventListener('orientationchange', onResize);
 
-    xrSession = await navigator.xr.requestSession('immersive-ar', {
-      requiredFeatures: ['local'],              // Variant Launch's polyfill reads this array; omitting it crashes on iOS
-      optionalFeatures: ['dom-overlay'],
-      domOverlay: { root: $('#overlay') },
-    });
+    xrSession = await withTimeout(
+      navigator.xr.requestSession('immersive-ar', {
+        requiredFeatures: ['local'],              // Variant Launch's polyfill reads this array; omitting it crashes on iOS
+        optionalFeatures: ['dom-overlay'],
+        domOverlay: { root: $('#overlay') },
+      }),
+      20000,
+      'Timed out waiting for the AR session to start (20s). This can happen if Variant Launch is ' +
+      'still loading or a camera/motion permission prompt got dismissed — check for a permission ' +
+      'popup, then try again.'
+    );
+    clearTimeout(reassureTimer);
 
     // A tap anywhere in the AR view fires 'select'
     const controller = renderer.xr.getController(0);
@@ -673,6 +696,7 @@ async function enterAR() {
     $('#overlay').style.display = 'block';
     renderer.setAnimationLoop(render);
   } catch (e) {
+    clearTimeout(reassureTimer);
     // Surface the REAL reason, and make it STICK on screen (alerts get dismissed / suppressed in the viewer).
     const msg = e ? ((e.name ? e.name + ': ' : '') + (e.message || String(e))) : 'unknown error';
     const el = $('#unsupported');
