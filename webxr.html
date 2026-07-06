@@ -73,8 +73,8 @@
   .pinLeader { position:fixed; z-index:10; width:2px; transform:translateX(-50%); transform-origin:top; background:linear-gradient(to bottom, rgba(255,255,255,.65), rgba(255,255,255,.15)); pointer-events:none; display:none; }
   .pinLeader::after { content:""; position:absolute; left:50%; bottom:-2px; width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.75); transform:translateX(-50%); }
   body.leaderMode-2 .pinLeader { display:none !important; }
-  body.leaderMode-3 .pinLeader { width:3px !important; background:linear-gradient(to bottom, rgba(255,20,220,1), rgba(255,20,220,.35)) !important; box-shadow:0 0 8px 2px rgba(255,20,220,.85); }
-  body.leaderMode-3 .pinLeader::after { width:9px !important; height:9px !important; background:#ff14dc !important; box-shadow:0 0 12px 4px rgba(255,20,220,.9); }
+  body.leaderMode-3 .pinLeader { width:2px !important; background:#ff14dc !important; box-shadow:none !important; }
+  body.leaderMode-3 .pinLeader::after { width:6px !important; height:6px !important; background:#ff14dc !important; box-shadow:none !important; }
   #leaderModeChip { position:fixed; right:12px; bottom:calc(100px + env(safe-area-inset-bottom)); z-index:14; background:rgba(0,0,0,.65); border:1px solid rgba(255,20,220,.7); color:#fff; font-size:11px; font-weight:700; padding:7px 11px; border-radius:10px; }
   /* A fixed width + normal wrapping so long names (e.g. "Madison Square Park Tower") wrap onto a
      second line instead of spilling out as one long nowrap line past the 60px pin head — with a
@@ -157,7 +157,7 @@
 </head>
 <body>
 
-<div id="version">v5.2 · leader line A/B debug (tap chip to cycle)</div>
+<div id="version">v5.3 · tighter toxic-pink leader line</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
