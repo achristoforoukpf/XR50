@@ -48,6 +48,10 @@
   /* Absolutely positioned + translateX(-50%) so long names center on their true rendered width —
      text-align:center on a nowrap block silently degrades to left-align once content overflows the 60px head. */
   .arlabel .pinName { position:absolute; left:50%; top:78px; transform:translateX(-50%); font-size:11px; font-weight:600; color:#fff; text-shadow:0 1px 3px #000; white-space:nowrap; }
+  /* Discovered state — a slight fade (applied via JS to the per-frame opacity) plus a checkmark badge. */
+  .arlabel .pinCheck { display:none; position:absolute; top:-4px; right:-4px; width:18px; height:18px; border-radius:50%; background:#2ecc71; color:#fff; font-size:11px; font-weight:800; align-items:center; justify-content:center; border:2px solid #fff; }
+  .arlabel.discovered .pinCheck { display:flex; }
+  #progressBadge { position:fixed; top:calc(64px + env(safe-area-inset-top)); left:12px; z-index:13; background:rgba(255,255,255,.92); color:#0A1E42; font-size:11px; font-weight:800; letter-spacing:.04em; padding:6px 10px; border-radius:8px; display:none; }
   #crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
   #crosshair::before, #crosshair::after { content:""; position:absolute; background:rgba(255,255,255,0.9); }
   #crosshair::before { width:2px; height:26px; left:-1px; top:-13px; }
@@ -66,7 +70,7 @@
   #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
   /* Alignment guide — shows where on the anchor building to aim before tapping Align. */
-  #alignGuide { position:fixed; left:12px; top:calc(68px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
+  #alignGuide { position:fixed; left:12px; top:calc(98px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
   #alignGuide svg { display:block; width:100%; height:auto; }
   #alignGuide p { font-size:11px; line-height:1.35; color:#fff; opacity:.92; margin-top:6px; }
   #alignGuide .close { position:absolute; top:2px; right:6px; background:none; border:none; color:#fff; opacity:.6; font-size:16px; padding:4px; }
@@ -90,7 +94,7 @@
 </head>
 <body>
 
-<div id="version">v3.3 · office/edge modes</div>
+<div id="version">v3.4 · discovery + real photos</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -151,6 +155,7 @@
 <div id="overlay">
   <div id="crosshair"></div>
   <div id="modeBadge">Office Mode</div>
+  <div id="progressBadge"></div>
   <div id="status">Move the phone slowly to start tracking, then aim at a building and tap its Align button…</div>
   <button id="exitBtn">Exit AR</button>
 
@@ -236,33 +241,33 @@ const EDGE_ANCHOR = { lat: 40.7538, lon: -74.0027 };
 function edgeInfo(desc, year){ return { architect:"Kohn Pedersen Fox", year: year || "TBD", height:"—", desc: desc || "Description pending." }; }
 const BUILDINGS_EDGE = [
   { name:"Empire State Building", lat:40.748817, lon:-73.985428, anchorOnly:true },
-  { name:"One Vanderbilt", lat:40.7528, lon:-73.9792, photo:"cover.jpg",
+  { name:"One Vanderbilt", lat:40.7528, lon:-73.9792, photo:"photos/one-vanderbilt.jpg", pos:"38% 32%",
     info:edgeInfo("The tallest office tower in Midtown, One Vanderbilt connects directly to the city's transportation network, blending private enterprise and the public realm.", "2020") },
-  { name:"5 Times Square", lat:40.7557, lon:-73.9874,
+  { name:"5 Times Square", lat:40.7557, lon:-73.9874, photo:"photos/5-times-square.jpg",
     info:edgeInfo("Located above one of New York's main subway hubs, 5 Times Square marks its location with an asymmetrical form to match the intersecting street patterns of the theater district.") },
-  { name:"520 Fifth Avenue", lat:40.7544, lon:-73.9805,
+  { name:"520 Fifth Avenue", lat:40.7544, lon:-73.9805, photo:"photos/520-fifth-avenue.jpg", pos:"66% 45%",
     info:edgeInfo("Located on Manhattan's most prestigious business and retail thoroughfare and designed with principles of sustainability, health, wellness, and connectivity, 520 Fifth Avenue is an 88-story vertical village that represents a new concept in luxury residential and boutique office space.") },
-  { name:"2 Waterline Square", lat:40.7734, lon:-73.9912,
+  { name:"2 Waterline Square", lat:40.7734, lon:-73.9912, photo:"photos/2-waterline-square.jpg",
     info:edgeInfo("Through creative planning and massing adjustments within the strict confines of a previously approved scheme, KPF achieved the client's brief, weaving together 645 mixed-income units with plentiful outdoor space and amenities.") },
-  { name:"55 Hudson Yards", lat:40.7556, lon:-74.0027,
+  { name:"55 Hudson Yards", lat:40.7556, lon:-74.0027, photo:"photos/55-hudson-yards.jpg",
     info:edgeInfo("55 Hudson Yards synthesizes the contemporary, sleek forms of Manhattan's new mega-development with the industrial roots of its neighboring Meatpacking District.", "2019") },
-  { name:"10 Hudson Yards", lat:40.7541, lon:-74.0019,   // CSV note: double check these coordinates
+  { name:"10 Hudson Yards", lat:40.7541, lon:-74.0019, photo:"photos/10-hudson-yards.jpg",   // CSV note: double check these coordinates
     info:edgeInfo("", "2019") },
-  { name:"20 Hudson Yards", lat:40.7534, lon:-74.0027,   // CSV note: update description
+  { name:"20 Hudson Yards", lat:40.7534, lon:-74.0027, photo:"photos/20-hudson-yards.jpg", pos:"32% 55%",   // CSV note: update description
     info:edgeInfo("Situated between 10 and 30 Hudson Yards, 20 Hudson Yards is home to The Shops and Restaurants at Hudson Yards, one of New York City's premiere locations for fashion and dining, elevating the standard for shopping in a dynamic, mixed-used setting.", "2019") },
-  { name:"One Madison Avenue", lat:40.7412, lon:-73.9869,
+  { name:"One Madison Avenue", lat:40.7412, lon:-73.9869, photo:"photos/one-madison-avenue.jpg", pos:"88% 48%",
     info:edgeInfo("With a design complementing its landmarked neighbor, the transformation of One Madison Avenue brings flexible, Class-A office space to Manhattan's Flatiron District.", "2024") },
-  { name:"Madison Square Park Tower", lat:40.7398, lon:-73.9874,
+  { name:"Madison Square Park Tower", lat:40.7398, lon:-73.9874, photo:"photos/madison-square-park-tower.jpg", pos:"60% 42%",
     info:edgeInfo("Tapering skyward from Manhattan's Flatiron district, the Madison Square Park Tower's crystalline form creates varied floorplates, ample room for customization of unit layouts, and an unparalleled residential experience.") },
-  { name:"500 West 21st Street", lat:40.7464, lon:-74.0051,
+  { name:"500 West 21st Street", lat:40.7464, lon:-74.0051, photo:"photos/500-west-21st-street.jpg",
     info:edgeInfo("Situated along New York City's celebrated High Line, 500 West 21st Street is a luxury 8-story residential building that respects its context with both its scale and the refined character of its façades.") },
-  { name:"Brooklyn Point", lat:40.6912, lon:-73.9825,
+  { name:"Brooklyn Point", lat:40.6912, lon:-73.9825, photo:"photos/brooklyn-point.jpg", pos:"38% 72%",
     info:edgeInfo("With its sculptural façade and eclectic materiality, Brooklyn Point sets a new standard for luxury living in Downtown Brooklyn while suiting the borough's renowned creative spirit.") },
-  { name:"111 Murray Street", lat:40.7154, lon:-74.0129,
+  { name:"111 Murray Street", lat:40.7154, lon:-74.0129, photo:"photos/111-murray-street.jpg", pos:"42% 40%",
     info:edgeInfo("An elegant addition to downtown Manhattan, 111 Murray will set a new standard for luxury residential buildings, both inside and out, while contrasting its surroundings in height and disposition.") },
-  { name:"388 Greenwich Street", lat:40.7206, lon:-74.0106,   // CSV note: needs a short description
+  { name:"388 Greenwich Street", lat:40.7206, lon:-74.0106, photo:"photos/388-greenwich-street.jpg",   // CSV note: needs a short description
     info:edgeInfo("", "") },
-  { name:"Hudson Commons", lat:40.7539, lon:-73.9965,
+  { name:"Hudson Commons", lat:40.7539, lon:-73.9965, photo:"photos/hudson-commons.jpg",
     info:edgeInfo("Situated at the gateway to the Hudson Yards submarket, this repositioned, LEED Platinum office tower maintains the expression of the site and neighborhood while attracting creative tenants to its new Class-A workspace.", "2018") },
 ];
 
@@ -275,6 +280,25 @@ for (const m of Object.values(MODES)) {
 }
 let MODE = 'office';
 let BUILDINGS = MODES[MODE].buildings;
+
+// ---- Discovery tracking ("gamification"): remember which buildings have had their card opened ----
+const DISCOVERED_KEY = 'xr50_discovered';
+let discovered = new Set(JSON.parse(localStorage.getItem(DISCOVERED_KEY) || '[]'));
+function isDiscovered(b){ return discovered.has(b.name); }
+function markDiscovered(b){
+  if (b.anchorOnly || discovered.has(b.name)) return;
+  discovered.add(b.name);
+  localStorage.setItem(DISCOVERED_KEY, JSON.stringify([...discovered]));
+  if (b.labelEl) b.labelEl.classList.add('discovered');
+  updateProgressBadge();
+}
+function updateProgressBadge(){
+  const real = BUILDINGS.filter(b => !b.anchorOnly);
+  const found = real.filter(isDiscovered).length;
+  const el = $('#progressBadge');
+  el.textContent = `${found} / ${real.length} discovered`;
+  el.style.display = real.length > 1 ? 'block' : 'none';
+}
 
 let renderer, scene, camera, xrSession = null;
 const camPos = new THREE.Vector3();
@@ -317,12 +341,13 @@ function setStatus(t){ $('#status').textContent = t; }
 function showInfo(b){
   $('#infoName').textContent = b.name;
   $('#infoPhoto').innerHTML = b.photo
-    ? `<img src="${b.photo}" alt="${b.name}">`
+    ? `<img src="${b.photo}" alt="${b.name}" style="object-position:${b.pos || 'center'}">`
     : `<span class="placeholder">No photo yet</span>`;
   $('#infoFields').innerHTML = `<dt>Architect</dt><dd>${b.info.architect}</dd>
     <dt>Completed</dt><dd>${b.info.year}</dd><dt>Height</dt><dd>${b.info.height}</dd>`;
   $('#infoDesc').textContent = b.info.desc;
   $('#infoCard').classList.add('open');
+  markDiscovered(b);
 }
 $('#infoClose').addEventListener('click', ()=> $('#infoCard').classList.remove('open'));
 
@@ -397,6 +422,7 @@ function rebuildAlignButtons(){
   btnBox.appendChild(guideChip);
 }
 rebuildAlignButtons();
+updateProgressBadge();
 
 // ---- Mode switch: Office (3 desk-test buildings) vs Edge (14 real KPF projects) ----
 function setMode(mode){
@@ -409,6 +435,7 @@ function setMode(mode){
   btnBox.classList.remove('collapsed');
   $$('.modeBtn').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
   $('#modeBadge').textContent = mode === 'edge' ? 'Edge Mode' : 'Office Mode';
+  updateProgressBadge();
   $('#alignGuideDiagram').style.display = mode === 'edge' ? 'block' : 'none';
   $('#alignGuideText').innerHTML = mode === 'edge'
     ? '<b>Empire State Building</b> — aim the crosshair at the corner where the stepped roofline meets the base of the spire, then tap Align.'
@@ -571,8 +598,9 @@ function render() {
       // Lazily create the DOM pin + edge arrow for this building.
       if (!b.labelEl) {
         b.labelEl = document.createElement('div'); b.labelEl.className = 'arlabel';
-        const photoInner = b.photo ? `<img class="pinPhoto" src="${b.photo}" alt="${b.name}">` : `<div class="pinPhoto placeholder">📍</div>`;
-        b.labelEl.innerHTML = `<div class="pinHead">${photoInner}</div><div class="pinTail"></div><div class="pinName">${b.name}</div>`;
+        if (isDiscovered(b)) b.labelEl.classList.add('discovered');
+        const photoInner = b.photo ? `<img class="pinPhoto" src="${b.photo}" alt="${b.name}" style="object-position:${b.pos || 'center'}">` : `<div class="pinPhoto placeholder">📍</div>`;
+        b.labelEl.innerHTML = `<div class="pinHead">${photoInner}</div><div class="pinCheck">✓</div><div class="pinTail"></div><div class="pinName">${b.name}</div>`;
         b.labelEl.addEventListener('pointerdown', () => { ignoreSelectUntil = performance.now() + 500; });
         b.labelEl.addEventListener('click', (e) => { e.stopPropagation(); showInfo(b); });
         $('#overlay').appendChild(b.labelEl);
@@ -620,7 +648,8 @@ function render() {
       el.style.display = 'block';
       el.style.left = it.x + 'px';
       el.style.top = it.y + 'px';
-      el.style.opacity = it.op.toFixed(3);
+      const seenFade = el.classList.contains('discovered') ? 0.55 : 1;   // slight fade once you've opened its card
+      el.style.opacity = (it.op * seenFade).toFixed(3);
       const s = 0.92 + 0.08 * it.b.appear;             // subtle scale-in with the fade
       el.style.transform = `translate(-50%,-100%) scale(${s.toFixed(3)})`;   // pin tip anchors the point, not its center
     }
