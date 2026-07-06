@@ -45,6 +45,7 @@
   #enterBtn:disabled { opacity:.4; }
   #unsupported { display:none; background:rgba(180,60,20,.92); padding:12px 14px; border-radius:12px; font-size:13px; max-width:330px; line-height:1.45; }
   #credit { position:absolute; bottom:calc(10px + env(safe-area-inset-bottom)); left:0; right:0; z-index:2; font-size:11px; opacity:.65; letter-spacing:.3px; }
+  #teamCredit { position:absolute; bottom:calc(27px + env(safe-area-inset-bottom)); left:0; right:0; z-index:2; font-size:11px; font-weight:700; opacity:.75; letter-spacing:.3px; }
 
   /* DOM overlay (drawn over the AR camera feed) */
   #overlay { position:fixed; inset:0; z-index:10; display:none; }
@@ -135,7 +136,7 @@
 </head>
 <body>
 
-<div id="version">v4.5 · fix stuck-on-Starting timeout</div>
+<div id="version">v4.6 · team credit, verbose diagnostics</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -193,6 +194,7 @@
   <div id="unsupported">This device/browser doesn't support WebXR AR. Open this page in <b>Chrome on an Android phone</b>. (iPhones/iPads need the native app — Safari has no WebXR.)</div>
   <p class="techNote">Real visual tracking on <b>Android</b> (ARCore) and <b>iPhone/iPad</b> (ARKit via Variant Launch — no app install).</p>
   <button id="resetProgressBtn" style="background:none;border:none;color:#fff;opacity:.55;font-size:12px;text-decoration:underline;padding:4px;">New guest on this device? Reset discovery progress</button>
+  <div id="teamCredit">Made possible by KPF Applied Technology + Marketing</div>
   <div id="credit">Illustration — One Vanderbilt (KPF). Swap in an official photo via cover.jpg.</div>
 </div>
 
@@ -563,15 +565,30 @@ function showUnsupported(html) {
   el.style.display = 'block';
 }
 
+// Verbose diagnostic block appended to every "AR isn't available" message — generic guidance alone
+// wasn't enough to tell a real Variant Launch/permission failure apart from "wrong browser", so
+// this surfaces exactly what the browser told us: whether navigator.xr exists at all, what
+// isSessionSupported actually returned or threw, and the user agent (distinguishes Safari vs an
+// in-app/Variant Launch webview vs Chrome vs Samsung Internet, etc).
+function diagBlock(supported, xrError){
+  return '<br><br><div style="font-family:monospace;font-size:10.5px;opacity:.8;text-align:left;word-break:break-all;border-top:1px solid rgba(255,255,255,.25);padding-top:8px;margin-top:4px;">' +
+    'navigator.xr present: ' + (!!navigator.xr) + '<br>' +
+    'isSessionSupported result: ' + supported + '<br>' +
+    'isSessionSupported error: ' + (xrError ? ((xrError.name ? xrError.name + ': ' : '') + (xrError.message || xrError)) : 'none') + '<br>' +
+    'userAgent: ' + navigator.userAgent +
+    '</div><br>Screenshot this and send it over if AR should be working here.';
+}
+
 async function init() {
   const dev = detectDevice();
 
   // Variant Launch provides WebXR on iOS via App Clip. Give it a moment to polyfill navigator.xr
   // before we test support (its script loads in <head>). On iOS in plain Safari it will present
   // its launch flow; inside the Launch viewer, immersive-ar becomes supported.
-  const supported = navigator.xr && await withTimeout(
-    navigator.xr.isSessionSupported('immersive-ar'), 10000, 'timed out'
-  ).catch(()=>false);
+  let xrSupportError = null;
+  const supported = navigator.xr ? await withTimeout(
+    navigator.xr.isSessionSupported('immersive-ar'), 10000, 'timed out waiting for isSessionSupported'
+  ).catch(e => { xrSupportError = e; return false; }) : false;
   if (supported) {
     $('#enterBtn').disabled = false;
     $('#enterBtn').textContent = 'Enter AR';
@@ -580,21 +597,25 @@ async function init() {
   }
 
   // Not (yet) supported here.
+  const diag = diagBlock(supported, xrSupportError);
   if (dev.iOS) {
     showUnsupported(
       "<b>Preparing AR…</b><br><br>" +
       "On iPhone/iPad this launches through an instant AR viewer (no install). If a prompt/banner appears, tap it. " +
-      "If nothing happens, make sure you opened this from the QR link, and that the site's domain is authorised in Variant Launch."
+      "If nothing happens, make sure you opened this from the QR link, and that the site's domain is authorised in Variant Launch." +
+      diag
     );
   } else if (dev.android) {
     showUnsupported(
       "<b>AR isn't available on this Android device yet.</b><br><br>" +
-      "Open in <b>Chrome</b> (not Samsung Internet / in-app browsers), and make sure <b>Chrome is updated</b> and <b>Google Play Services for AR</b> is installed."
+      "Open in <b>Chrome</b> (not Samsung Internet / in-app browsers), and make sure <b>Chrome is updated</b> and <b>Google Play Services for AR</b> is installed." +
+      diag
     );
   } else {
     showUnsupported(
       "<b>Open this on your phone.</b><br><br>" +
-      "This AR experience runs on a mobile device — scan the QR code or open this link on an <b>Android phone</b> or <b>iPhone</b>."
+      "This AR experience runs on a mobile device — scan the QR code or open this link on an <b>Android phone</b> or <b>iPhone</b>." +
+      diag
     );
   }
 }
@@ -700,7 +721,10 @@ async function enterAR() {
     // Surface the REAL reason, and make it STICK on screen (alerts get dismissed / suppressed in the viewer).
     const msg = e ? ((e.name ? e.name + ': ' : '') + (e.message || String(e))) : 'unknown error';
     const el = $('#unsupported');
-    el.innerHTML = '<b>AR failed to start.</b><br><br><span style="font-family:monospace;font-size:12px">' + msg + '</span><br><br>Screenshot this and send it over.';
+    el.innerHTML = '<b>AR failed to start.</b><br><br><span style="font-family:monospace;font-size:12px;word-break:break-all;">' + msg + '</span>' +
+      '<br><br><div style="font-family:monospace;font-size:10.5px;opacity:.8;text-align:left;word-break:break-all;border-top:1px solid rgba(255,255,255,.25);padding-top:8px;">' +
+      'userAgent: ' + navigator.userAgent + '</div>' +
+      '<br>Screenshot this and send it over.';
     el.style.display = 'block';
     $('#enterBtn').textContent = 'Enter AR — retry';
     $('#gate').style.display = 'flex';
