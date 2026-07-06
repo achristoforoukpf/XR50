@@ -70,17 +70,6 @@
   .arlabel .pinPhoto { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
   .arlabel .pinPhoto.placeholder { display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.55); font-size:22px; }
   .arlabel .pinTail { width:0; height:0; margin:-1px auto 0; border-left:9px solid transparent; border-right:9px solid transparent; border-top:14px solid #fff; }
-  /* Leader line — ties a pin floating above the skyline down to the actual building at the true
-     horizon, so it's never ambiguous which tower a pin refers to even when it's hovering well above
-     the roofline. A separate fixed element (not a child of .arlabel) since its height varies.
-     DEBUG: 3 on-site test styles, cycled via the "Leader" chip — once you've picked one, delete
-     leaderModeChip/leaderTestMode and the mode-2/mode-3 CSS below, keeping only the base rule. */
-  .pinLeader { position:fixed; z-index:10; width:2px; transform:translateX(-50%); transform-origin:top; background:linear-gradient(to bottom, rgba(255,255,255,.65), rgba(255,255,255,.15)); pointer-events:none; display:none; }
-  .pinLeader::after { content:""; position:absolute; left:50%; bottom:-2px; width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.75); transform:translateX(-50%); }
-  body.leaderMode-2 .pinLeader { display:none !important; }
-  body.leaderMode-3 .pinLeader { width:2px !important; background:#ff14dc !important; box-shadow:none !important; }
-  body.leaderMode-3 .pinLeader::after { width:6px !important; height:6px !important; background:#ff14dc !important; box-shadow:none !important; }
-  #leaderModeChip { position:fixed; right:12px; bottom:calc(100px + env(safe-area-inset-bottom)); z-index:14; background:rgba(0,0,0,.65); border:1px solid rgba(255,20,220,.7); color:#fff; font-size:11px; font-weight:700; padding:7px 11px; border-radius:10px; }
   /* A fixed width + normal wrapping so long names (e.g. "Madison Square Park Tower") wrap onto a
      second line instead of spilling out as one long nowrap line past the 60px pin head — with a
      declared width, text-align:center is safe here (the earlier bug was specifically about
@@ -162,7 +151,7 @@
 </head>
 <body>
 
-<div id="version">v5.6 · drop Architect field, uncropped info photo</div>
+<div id="version">v5.7 · plain pins, no leader lines</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -232,7 +221,6 @@
   <div id="progressBadge"></div>
   <div id="status">Step 1 — move the phone, then point at the Empire State Building and tap Align.</div>
   <button id="exitBtn">Exit AR</button>
-  <button id="leaderModeChip">Leader: 1 (white)</button>
 
   <div id="alignGuide">
     <button class="close" id="alignGuideClose">&times;</button>
@@ -446,7 +434,6 @@ function alignOn(ref) {
   for (const b of BUILDINGS) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
     b.dir = dirFromYaw(refYaw + dTheta, b.anchorOnly ? 0 : PIN_ELEV).normalize();   // fixed DIRECTION (behaves like infinity)
-    b.dirGround = b.anchorOnly ? null : dirFromYaw(refYaw + dTheta, 0).normalize();   // same bearing at the true horizon — anchors the leader line to the actual building instead of floating pin with no visual tie to the skyline
     b.sx = undefined; b.sy = undefined;   // snap cleanly into the new alignment instead of gliding from the old one
   }
   aligned = true;
@@ -590,25 +577,6 @@ function showAlignGuide(){ $('#alignGuide').style.display = 'block'; }
 function hideAlignGuide(){ $('#alignGuide').style.display = 'none'; }
 $('#alignGuideClose').addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
 $('#alignGuideClose').addEventListener('click', (e)=> { e.stopPropagation(); hideAlignGuide(); });
-
-// DEBUG — on-site A/B test for the leader line style. Cycles 1 (white, current default) → 2 (none)
-// → 3 (toxic pink). Delete this whole block + #leaderModeChip + the leaderMode-2/3 CSS once you've
-// picked one; leave just the base .pinLeader rule for whichever style won.
-const LEADER_MODES = [
-  { cls: '', label: 'Leader: 1 (white)' },
-  { cls: 'leaderMode-2', label: 'Leader: 2 (none)' },
-  { cls: 'leaderMode-3', label: 'Leader: 3 (toxic pink)' },
-];
-let leaderModeIdx = 0;
-const leaderModeChip = $('#leaderModeChip');
-leaderModeChip.addEventListener('pointerdown', () => { ignoreSelectUntil = performance.now() + 500; });
-leaderModeChip.addEventListener('click', (e) => {
-  e.stopPropagation();
-  leaderModeIdx = (leaderModeIdx + 1) % LEADER_MODES.length;
-  document.body.classList.remove(...LEADER_MODES.map(m => m.cls).filter(Boolean));
-  if (LEADER_MODES[leaderModeIdx].cls) document.body.classList.add(LEADER_MODES[leaderModeIdx].cls);
-  leaderModeChip.textContent = LEADER_MODES[leaderModeIdx].label;
-});
 
 // ---- WebXR setup ----
 // ---- Device detection ----
@@ -877,7 +845,6 @@ function render() {
         b.labelEl.addEventListener('click', (e) => { e.stopPropagation(); showInfo(b); });
         $('#overlay').appendChild(b.labelEl);
         b.pinHeadEl = b.labelEl.querySelector('.pinHead');   // cached so the focus glow below doesn't query the DOM every frame
-        b.leaderEl = document.createElement('div'); b.leaderEl.className = 'pinLeader'; $('#overlay').appendChild(b.leaderEl);
       }
       // Opacity: dim far buildings, brighten the one you're aiming toward ("approach" = look at it).
       // No manual fade-in ramp here — the CSS transition on .arlabel eases every opacity/transform
@@ -913,21 +880,12 @@ function render() {
           const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
           if (dist > 0.01) { b.sx += (dx / dist) * step; b.sy += (dy / dist) * step; }
         }
-        // Where this building's true horizon point (elevation 0) projects to right now, relative
-        // to its own raw target this frame — added onto the already-smoothed pin position below,
-        // so the leader line inherits the same jitter-resistance as the pin without needing its
-        // own separate smoothing state.
-        const fwdG = b.dirGround.dot(camForward), rightG = b.dirGround.dot(camRight), upG = b.dirGround.dot(camUp);
-        const ndcXG = fwdG > 0.05 ? (rightG/fwdG)/tanH : ndcX, ndcYG = fwdG > 0.05 ? (upG/fwdG)/tanV : ndcY;
-        b.leadDx = (cx + ndcXG * cx) - tx;
-        b.leadDy = (cy - ndcYG * cy) - ty;
       }
 
       if (onScreen) {
         onList.push({ b, x: b.sx, y: b.sy, op });
       } else {
         b.labelEl.style.opacity = '0';
-        b.leaderEl.style.display = 'none';
         // Bucket by 8-way direction so several off-screen buildings in the same general direction
         // collapse into one indicator instead of a pile of separate dots.
         let dx = fwd > 0.02 ? ndcX : right, dy = fwd > 0.02 ? ndcY : up;
@@ -989,19 +947,6 @@ function render() {
         it.b.pinHeadEl.style.boxShadow = focus > 0.08
           ? `0 0 ${(10 + 26 * focus).toFixed(0)}px rgba(255,255,255,${(0.25 + 0.45 * focus).toFixed(2)})`
           : 'none';
-      }
-      // Leader line from the pin's tip down to the true building position at the horizon —
-      // ties the floating pin to the actual tower instead of leaving it ambiguous in open sky.
-      const leader = it.b.leaderEl;
-      const leadDx = it.b.leadDx || 0, leadDy = it.b.leadDy || 0;
-      if (leader && leadDy > 4) {
-        leader.style.display = 'block';
-        leader.style.left = (it.x + leadDx) + 'px';
-        leader.style.top = it.y + 'px';
-        leader.style.height = leadDy + 'px';
-        leader.style.opacity = (it.op * seenFade).toFixed(3);
-      } else if (leader) {
-        leader.style.display = 'none';
       }
     }
   }
