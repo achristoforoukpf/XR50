@@ -118,11 +118,24 @@
   @keyframes celebrateIn { 0%{transform:scale(0.85);opacity:0;} 100%{transform:scale(1);opacity:1;} }
   #celebrateBanner { display:none; margin-top:14px; padding:10px 14px; border-radius:10px; background:#eafaf0; color:#1a7a45; font-weight:700; font-size:14px; }
   #celebrateBanner.show { display:block; animation:celebrateIn .4s ease-out; }
+
+  /* Big one-time celebration for finding all 14 — a step above the per-pin discovery flourish. */
+  #completeOverlay { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; background:rgba(4,10,24,0.72); }
+  #completeOverlay.show { display:flex; }
+  @keyframes trophyPop { 0%{transform:scale(0.3) rotate(-12deg); opacity:0;} 60%{transform:scale(1.15) rotate(4deg); opacity:1;} 100%{transform:scale(1) rotate(0deg); opacity:1;} }
+  #completeCard { position:relative; z-index:1; max-width:300px; text-align:center; background:var(--kpf-paper); border-radius:18px; padding:32px 26px 26px; box-shadow:0 20px 60px rgba(0,0,0,.5); animation:celebrateIn .5s var(--ease-spring); }
+  #completeTrophy { font-size:52px; animation:trophyPop .6s var(--ease-spring) .1s both; }
+  #completeCard h2 { color:var(--kpf-navy); font-size:22px; font-weight:800; margin:10px 0 8px; }
+  #completeCard p { color:var(--kpf-body); font-size:14px; line-height:1.5; margin:0 0 20px; }
+  #completeClose { background:var(--kpf-navy); color:#fff; font-weight:700; font-size:15px; padding:12px 28px; border-radius:24px; border:none; }
+  #confettiLayer { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
+  @keyframes confettiFall { 0%{transform:translateY(-10vh) rotate(0deg); opacity:1;} 100%{transform:translateY(110vh) rotate(540deg); opacity:.9;} }
+  .confetti { position:absolute; top:0; width:8px; height:14px; opacity:0; animation-name:confettiFall; animation-timing-function:cubic-bezier(0.4,0.1,0.6,0.9); animation-fill-mode:forwards; }
 </style>
 </head>
 <body>
 
-<div id="version">v4.1 · vendored three.js, portrait lock, polish pass</div>
+<div id="version">v4.2 · all-14 completion celebration</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -215,6 +228,16 @@
     <div id="celebrateBanner"></div>
     <div class="tag">PLACEHOLDER DATA — demo only</div>
   </div>
+
+  <div id="completeOverlay">
+    <div id="confettiLayer"></div>
+    <div id="completeCard">
+      <div id="completeTrophy">🏆</div>
+      <h2>All 14 Found!</h2>
+      <p>You've discovered every KPF project visible from Edge. Nice work.</p>
+      <button id="completeClose">Nice!</button>
+    </div>
+  </div>
 </div>
 
 <script type="module">
@@ -303,13 +326,41 @@ function updateProgressBadge(){
   const el = $('#progressBadge');
   el.textContent = `${found} / ${real.length} discovered`;
   el.style.display = real.length > 1 ? 'block' : 'none';
+  return found === real.length;
 }
+
+// ---- Big celebration for finding all 14 — plays once ever per device, not once per app open ----
+const COMPLETED_KEY = 'xr50_completed';
+const CONFETTI_COLORS = ['#2ecc71', '#ffd166', '#ef476f', '#4da3ff', '#f7f7f2'];
+function spawnConfetti(){
+  const layer = $('#confettiLayer');
+  layer.innerHTML = '';
+  for (let i = 0; i < 60; i++) {
+    const el = document.createElement('div');
+    el.className = 'confetti';
+    el.style.left = (Math.random() * 100) + '%';
+    el.style.background = CONFETTI_COLORS[i % CONFETTI_COLORS.length];
+    el.style.animationDuration = (1.8 + Math.random() * 1.4) + 's';
+    el.style.animationDelay = (Math.random() * 0.6) + 's';
+    el.style.borderRadius = Math.random() < 0.5 ? '50%' : '2px';
+    layer.appendChild(el);
+  }
+}
+function celebrateCompletion(){
+  if (localStorage.getItem(COMPLETED_KEY) === '1') return;
+  localStorage.setItem(COMPLETED_KEY, '1');
+  spawnConfetti();
+  $('#completeOverlay').classList.add('show');
+}
+$('#completeClose').addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
+$('#completeClose').addEventListener('click', () => $('#completeOverlay').classList.remove('show'));
 
 // Progress is per-device (localStorage never leaves the phone), so different guests on their own
 // phones already get separate counts. This is only for a shared demo device passed between guests.
 $('#resetProgressBtn').addEventListener('click', () => {
   discovered.clear();
   localStorage.removeItem(DISCOVERED_KEY);
+  localStorage.removeItem(COMPLETED_KEY);
   for (const b of BUILDINGS) {
     if (b.labelEl) b.labelEl.classList.remove('discovered');
   }
@@ -387,6 +438,7 @@ function showInfo(b){
     const total = BUILDINGS.filter(x => !x.anchorOnly).length;
     banner.textContent = `🎉 New discovery! ${discovered.size} / ${total} found.`;
     banner.classList.add('show');
+    if (discovered.size === total) setTimeout(celebrateCompletion, 900);   // let the per-pin banner land first
   } else {
     banner.classList.remove('show');
   }
