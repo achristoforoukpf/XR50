@@ -61,7 +61,7 @@
   #crosshair::before { width:2px; height:26px; left:-1px; top:-13px; }
   #crosshair::after  { height:2px; width:26px; top:-1px; left:-13px; }
 
-  #status { position:fixed; top:calc(40px + env(safe-area-inset-top)); left:12px; right:12px; text-align:center; font-size:13px; font-weight:600; text-shadow:0 1px 3px #000; }
+  #status { position:fixed; top:calc(104px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:13; max-width:min(78%, 340px); text-align:center; font-size:12.5px; font-weight:600; line-height:1.4; color:#fff; background:rgba(10,30,66,0.78); padding:7px 14px; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.35); }
 
   #placeBtns { position:fixed; left:0; right:0; bottom:calc(20px + env(safe-area-inset-bottom)); display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding:0 12px; }
   #placeBtns button { background:rgba(10,30,66,0.92); border:1.5px solid #fff; color:#fff; font-size:14px; font-weight:600; padding:12px 16px; border-radius:24px; box-shadow:0 3px 10px rgba(0,0,0,.5); }
@@ -74,7 +74,7 @@
   #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
   /* Alignment guide — shows where on the anchor building to aim before tapping Align. */
-  #alignGuide { position:fixed; left:12px; top:calc(98px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
+  #alignGuide { position:fixed; left:12px; top:calc(164px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
   #alignGuide svg { display:block; width:100%; height:auto; }
   #alignGuide p { font-size:11px; line-height:1.35; color:#fff; opacity:.92; margin-top:6px; }
   #alignGuide .close { position:absolute; top:2px; right:6px; background:none; border:none; color:#fff; opacity:.6; font-size:16px; padding:4px; }
@@ -98,7 +98,7 @@
 </head>
 <body>
 
-<div id="version">v3.5 · pin collisions + sleeker UI</div>
+<div id="version">v3.6 · clean top UI + progress reset</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -153,6 +153,7 @@
   <button id="enterBtn" disabled>Checking device…</button>
   <div id="unsupported">This device/browser doesn't support WebXR AR. Open this page in <b>Chrome on an Android phone</b>. (iPhones/iPads need the native app — Safari has no WebXR.)</div>
   <p style="font-size:12px;opacity:.6">After entering: slowly move the phone a moment so tracking initializes, aim the crosshair at a building you can identify, and tap its <b>Align</b> button.</p>
+  <button id="resetProgressBtn" style="background:none;border:none;color:#fff;opacity:.55;font-size:12px;text-decoration:underline;padding:4px;">New guest on this device? Reset discovery progress</button>
   <div id="credit">Illustration — One Vanderbilt (KPF). Swap in an official photo via cover.jpg.</div>
 </div>
 
@@ -303,6 +304,19 @@ function updateProgressBadge(){
   el.textContent = `${found} / ${real.length} discovered`;
   el.style.display = real.length > 1 ? 'block' : 'none';
 }
+
+// Progress is per-device (localStorage never leaves the phone), so different guests on their own
+// phones already get separate counts. This is only for a shared demo device passed between guests.
+$('#resetProgressBtn').addEventListener('click', () => {
+  discovered.clear();
+  localStorage.removeItem(DISCOVERED_KEY);
+  for (const b of [...BUILDINGS_OFFICE, ...BUILDINGS_EDGE]) {
+    if (b.labelEl) b.labelEl.classList.remove('discovered');
+  }
+  updateProgressBadge();
+  $('#resetProgressBtn').textContent = 'Progress reset ✓';
+  setTimeout(() => { $('#resetProgressBtn').textContent = 'New guest on this device? Reset discovery progress'; }, 1800);
+});
 
 let renderer, scene, camera, xrSession = null;
 const camPos = new THREE.Vector3();
