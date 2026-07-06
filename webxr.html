@@ -44,7 +44,7 @@
   #overlay { position:fixed; inset:0; z-index:10; display:none; }
   /* Off-screen indicator: a small icon-only chevron dot — no name text, to stay out of the way when
      many buildings are off-screen at once. */
-  .arrow { position:fixed; z-index:11; width:26px; height:26px; transform:translate(-50%,-50%); background:rgba(10,30,66,0.75); border:1px solid rgba(255,255,255,0.5); color:#fff; font-size:13px; display:none; align-items:center; justify-content:center; border-radius:50%; pointer-events:none; box-shadow:0 2px 6px rgba(0,0,0,.35); transition:opacity .4s ease; }
+  .arrow { position:fixed; z-index:11; min-width:26px; height:26px; padding:0 8px; transform:translate(-50%,-50%); background:rgba(10,30,66,0.75); border:1px solid rgba(255,255,255,0.5); color:#fff; font-size:12px; font-weight:700; display:none; align-items:center; justify-content:center; gap:3px; border-radius:13px; white-space:nowrap; pointer-events:none; box-shadow:0 2px 6px rgba(0,0,0,.35); transition:opacity .4s ease, left .3s ease, top .3s ease; }
   /* Welded labels are DOM (crisp on all devices — the 3D canvas texture was blurred by iOS's reduced-res WebGL layer) */
   /* Pin label: a map-pin with the project photo nested in the head, tail pointing at the building.
      opacity/transform transition here drives the "reaching full opacity" fade-in as pins come into view
@@ -66,7 +66,7 @@
   #crosshair::before { width:2px; height:26px; left:-1px; top:-13px; }
   #crosshair::after  { height:2px; width:26px; top:-1px; left:-13px; }
 
-  #status { position:fixed; top:calc(104px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:13; max-width:min(78%, 340px); text-align:center; font-size:12.5px; font-weight:600; line-height:1.4; color:#fff; background:rgba(10,30,66,0.78); padding:7px 14px; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.35); }
+  #status { position:fixed; top:calc(104px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:13; max-width:min(78%, 340px); text-align:center; font-size:12.5px; font-weight:600; line-height:1.4; color:#fff; background:rgba(10,30,66,0.78); padding:7px 14px; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.35); transition:opacity .6s ease; }
 
   #placeBtns { position:fixed; left:0; right:0; bottom:calc(20px + env(safe-area-inset-bottom)); display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding:0 12px; }
   #placeBtns button { background:rgba(10,30,66,0.92); border:1.5px solid #fff; color:#fff; font-size:14px; font-weight:600; padding:12px 16px; border-radius:24px; box-shadow:0 3px 10px rgba(0,0,0,.5); }
@@ -103,7 +103,7 @@
 </head>
 <body>
 
-<div id="version">v3.7 · splash screen rewrite</div>
+<div id="version">v3.8 · fixes: exit-AR freeze, merged arrows</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -362,12 +362,19 @@ function alignOn(ref) {
     b.dir = dirFromYaw(refYaw + dTheta, b.anchorOnly ? 0 : PIN_ELEV).normalize();   // fixed DIRECTION (behaves like infinity)
   }
   aligned = true;
-  setStatus(`Aligned on ${ref.name}. Pan around — all labels are placed and welded. Tap one for info.`);
+  setStatus(`Aligned on ${ref.name}. Pan around — tap any pin for info.`, 3000);   // brief confirmation, then get out of the way
   $('#placeBtns').classList.add('collapsed');                             // tuck the align buttons into a Re-align chip
   hideAlignGuide();
 }
 
-function setStatus(t){ $('#status').textContent = t; }
+let statusHideTimer = null;
+function setStatus(t, autoHideMs){
+  const el = $('#status');
+  el.textContent = t;
+  el.style.opacity = '1';
+  clearTimeout(statusHideTimer);
+  if (autoHideMs) statusHideTimer = setTimeout(() => { el.style.opacity = '0'; }, autoHideMs);
+}
 
 // ---- Info card ----
 function showInfo(b){
@@ -414,7 +421,7 @@ function onSelect(){
   if (performance.now() < ignoreSelectUntil) return;   // ignore taps that were on buttons
   let best = null, bestDot = Math.cos(26 * Math.PI/180);
   for (const b of BUILDINGS) {
-    if (!b.dir || b.anchorOnly) continue;   // anchor-only entries (e.g. ESB) have no info card
+    if (!b.dir || b.anchorOnly || !b.onScreen) continue;   // only match buildings with a visible pin
     const d = b.dir.dot(camForward);
     if (d > bestDot) { bestDot = d; best = b; }
   }
@@ -465,7 +472,8 @@ function setMode(mode){
   MODE = mode;
   BUILDINGS = MODES[mode].buildings;
   $$('#overlay .arlabel, #overlay .arrow').forEach(el => el.remove());   // drop stale pins from the other mode
-  BUILDINGS.forEach(b => { b.dir = null; b.labelEl = null; b.arrowEl = null; b.appear = 0; });
+  Object.keys(arrowPool).forEach(k => delete arrowPool[k]);              // arrow elements above were just removed from the DOM — drop the stale cache too
+  BUILDINGS.forEach(b => { b.dir = null; b.labelEl = null; b.onScreen = false; });
   aligned = false;
   rebuildAlignButtons();
   btnBox.classList.remove('collapsed');
@@ -579,6 +587,12 @@ async function enterAR() {
     scene.add(controller);
 
     xrSession.addEventListener('end', () => {
+      renderer.setAnimationLoop(null);   // stop the render loop — otherwise it keeps calling render()
+                                          // via a plain rAF after the session ends, hammering
+                                          // renderer.xr.getCamera() with no active XR frame and
+                                          // spamming errors that were choking the gate's own UI.
+      xrSession = null;
+      aligned = false;
       $('#overlay').style.display = 'none';
       $('#gate').style.display = 'flex';
       $('#enterBtn').textContent = 'Enter AR';
@@ -613,7 +627,21 @@ function chevron(dx, dy) {
   return CHEVRONS[Math.round(d/45) % 8];
 }
 
+// One shared indicator per direction (not per building) — several off-screen buildings in the same
+// general direction collapse into a single chevron with a count, instead of a pile of separate dots.
+const arrowPool = {};
+function getArrowEl(key) {
+  if (!arrowPool[key]) {
+    const el = document.createElement('div');
+    el.className = 'arrow';
+    $('#overlay').appendChild(el);
+    arrowPool[key] = el;
+  }
+  return arrowPool[key];
+}
+
 function render() {
+  if (!renderer.xr.isPresenting) return;   // belt-and-suspenders: never touch the XR camera outside a live session
   // Capture current camera pose (valid inside the XR frame) for placement + aim tests.
   const xrCam = renderer.xr.getCamera();
   xrCam.getWorldPosition(camPos);
@@ -629,7 +657,8 @@ function render() {
     const W = innerWidth, H = innerHeight, cx = W/2, cy = H/2, mx = cx - 48, my = cy - 72;
 
     const onList = [];
-    const offList = [];
+    const offBuckets = {};      // direction-key -> { count, x (sum), y (sum), op }
+    const usedArrowKeys = new Set();
     for (const b of BUILDINGS) {
       if (!b.dir || b.anchorOnly) continue;   // anchor-only entries (e.g. ESB) never get a pin
       // Lazily create the DOM pin + edge arrow for this building.
@@ -642,8 +671,6 @@ function render() {
         b.labelEl.addEventListener('click', (e) => { e.stopPropagation(); showInfo(b); });
         $('#overlay').appendChild(b.labelEl);
       }
-      if (!b.arrowEl) { b.arrowEl = document.createElement('div'); b.arrowEl.className = 'arrow'; $('#overlay').appendChild(b.arrowEl); }
-
       // Opacity: dim far buildings, brighten the one you're aiming toward ("approach" = look at it).
       // No manual fade-in ramp here — the CSS transition on .arlabel eases every opacity/transform
       // change we set below, which naturally animates the "reaching full opacity" effect as pins
@@ -655,18 +682,22 @@ function render() {
 
       const ndcX = fwd > 0 ? (right/fwd)/tanH : 99, ndcY = fwd > 0 ? (up/fwd)/tanV : 99;
       const onScreen = fwd > 0 && Math.abs(ndcX) <= 1 && Math.abs(ndcY) <= 1;
+      b.onScreen = onScreen;   // onSelect() only matches buildings that actually have a visible pin
 
       if (onScreen) {
-        b.arrowEl.style.opacity = '0';
         onList.push({ b, x: cx + ndcX * cx, y: cy - ndcY * cy, op });
       } else {
         b.labelEl.style.opacity = '0';
-        // Point an edge indicator toward the off-screen label.
+        // Bucket by 8-way direction so several off-screen buildings in the same general direction
+        // collapse into one indicator instead of a pile of separate dots.
         let dx = fwd > 0.02 ? ndcX : right, dy = fwd > 0.02 ? ndcY : up;
         let sdx = dx, sdy = -dy;                       // screen y is down
         const L = Math.hypot(sdx, sdy) || 1; sdx /= L; sdy /= L;
         const t = Math.min(Math.abs(sdx) < 1e-3 ? 1e9 : mx/Math.abs(sdx), Math.abs(sdy) < 1e-3 ? 1e9 : my/Math.abs(sdy));
-        offList.push({ b, x: cx + sdx*t, y: cy + sdy*t, dir: chevron(sdx, sdy), op });
+        const key = chevron(sdx, sdy);
+        if (!offBuckets[key]) offBuckets[key] = { count:0, x:0, y:0, op:0 };
+        const bucket = offBuckets[key];
+        bucket.count++; bucket.x += cx + sdx*t; bucket.y += cy + sdy*t; bucket.op = Math.max(bucket.op, op);
       }
     }
 
@@ -686,22 +717,19 @@ function render() {
       if (bumps) onList[i].x += (bumps % 2 === 0 ? 1 : -1) * 20 * Math.ceil(bumps / 2);
     }
 
-    // Same idea for off-screen edge indicators — several buildings sharing a similar off-screen
-    // direction would otherwise land right on top of each other.
-    offList.sort((a, b) => a.y - b.y);
-    const AGAP = 30, ANEAR = 130;
-    for (let i = 1; i < offList.length; i++)
-      for (let j = 0; j < i; j++)
-        if (Math.abs(offList[i].x - offList[j].x) < ANEAR && offList[i].y - offList[j].y < AGAP)
-          offList[i].y = offList[j].y + AGAP;
-
-    for (const it of offList) {
-      const el = it.b.arrowEl;
-      el.style.left = it.x + 'px';
-      el.style.top = it.y + 'px';
-      el.style.opacity = it.op.toFixed(3);
+    // One indicator per direction bucket, at the average position of everything in it.
+    for (const key of Object.keys(offBuckets)) {
+      const bucket = offBuckets[key];
+      const el = getArrowEl(key);
+      el.style.left = (bucket.x / bucket.count) + 'px';
+      el.style.top = (bucket.y / bucket.count) + 'px';
+      el.style.opacity = bucket.op.toFixed(3);
       el.style.display = 'flex';
-      el.textContent = it.dir;
+      el.textContent = bucket.count > 1 ? `${key} ${bucket.count}` : key;
+      usedArrowKeys.add(key);
+    }
+    for (const key of Object.keys(arrowPool)) {
+      if (!usedArrowKeys.has(key)) arrowPool[key].style.display = 'none';
     }
 
     for (const it of onList) {
