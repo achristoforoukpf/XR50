@@ -89,7 +89,7 @@
   /* Info card — KPF brand styling: white, navy headings, wide-tracked uppercase meta labels */
   #infoCard { position:fixed; left:0; right:0; bottom:0; z-index:12; background:var(--kpf-paper); border-radius:14px 14px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .25s ease; box-shadow:0 -8px 30px rgba(0,0,0,.35); }
   #infoCard.open { transform:translateY(0); }
-  #infoCard .close { position:absolute; top:12px; right:16px; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; }
+  #infoCard .close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; z-index:1; }
   #infoCard .infoPhoto { width:100%; height:160px; border-radius:10px; margin-bottom:16px; overflow:hidden; background:#e3ded2; display:flex; align-items:center; justify-content:center; }
   #infoCard .infoPhoto img { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
   #infoCard .infoPhoto .placeholder { color:var(--kpf-meta); font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
@@ -103,7 +103,7 @@
 </head>
 <body>
 
-<div id="version">v3.8 · fixes: exit-AR freeze, merged arrows</div>
+<div id="version">v3.9 · fixes: re-enter AR, pin jitter, card close</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -352,6 +352,7 @@ function dirFromYaw(yaw, elevRad) {
 // Align on one recognizable building: aim the crosshair at it, tap its button. Its real bearing
 // becomes the anchor; every other label is placed at its own bearing offset from that.
 const PIN_ELEV = 5 * Math.PI / 180;   // pins hover at a fixed elevation above the skyline, not at each building's real bearing height
+const POS_SMOOTH = 0.22;   // 0-1, how much of the remaining distance to close each frame — lower = smoother but laggier
 
 function alignOn(ref) {
   if (camForward.lengthSq() === 0) { setStatus('Tracking not ready — move the phone a moment.'); return; }
@@ -360,6 +361,7 @@ function alignOn(ref) {
   for (const b of BUILDINGS) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
     b.dir = dirFromYaw(refYaw + dTheta, b.anchorOnly ? 0 : PIN_ELEV).normalize();   // fixed DIRECTION (behaves like infinity)
+    b.sx = undefined; b.sy = undefined;   // snap cleanly into the new alignment instead of gliding from the old one
   }
   aligned = true;
   setStatus(`Aligned on ${ref.name}. Pan around — tap any pin for info.`, 3000);   // brief confirmation, then get out of the way
@@ -388,6 +390,9 @@ function showInfo(b){
   $('#infoCard').classList.add('open');
   markDiscovered(b);
 }
+// stopPropagation here so the swipe-to-dismiss handler below (bound to the whole card) never sees
+// this pointerdown and starts a drag — without it, tapping × could get swallowed by pointer capture.
+$('#infoClose').addEventListener('pointerdown', (e) => e.stopPropagation());
 $('#infoClose').addEventListener('click', ()=> $('#infoCard').classList.remove('open'));
 
 // Swipe-down to dismiss the info card.
@@ -409,7 +414,7 @@ $('#infoClose').addEventListener('click', ()=> $('#infoCard').classList.remove('
     dragging = false;
     card.style.transition = '';
     card.style.transform = '';
-    if (dy > 80) card.classList.remove('open');                 // dragged far enough → dismiss
+    if (dy > 60) card.classList.remove('open');                 // dragged far enough → dismiss (was 80 — felt too stiff)
   };
   card.addEventListener('pointerup', end);
   card.addEventListener('pointercancel', end);
@@ -473,7 +478,7 @@ function setMode(mode){
   BUILDINGS = MODES[mode].buildings;
   $$('#overlay .arlabel, #overlay .arrow').forEach(el => el.remove());   // drop stale pins from the other mode
   Object.keys(arrowPool).forEach(k => delete arrowPool[k]);              // arrow elements above were just removed from the DOM — drop the stale cache too
-  BUILDINGS.forEach(b => { b.dir = null; b.labelEl = null; b.onScreen = false; });
+  BUILDINGS.forEach(b => { b.dir = null; b.labelEl = null; b.onScreen = false; b.sx = undefined; b.sy = undefined; });
   aligned = false;
   rebuildAlignButtons();
   btnBox.classList.remove('collapsed');
@@ -551,6 +556,7 @@ async function init() {
 
 async function enterAR() {
   $('#enterBtn').textContent = 'Starting…';
+  let onResize = null;   // declared outside the try so the catch block can safely remove it too
   try {
     scene = new THREE.Scene();
     camera = new THREE.PerspectiveCamera(70, innerWidth/innerHeight, 0.05, 1000);
@@ -567,7 +573,7 @@ async function enterAR() {
     scene.add(new THREE.HemisphereLight(0xffffff, 0x444444, 1.5));
 
     // Keep renderer + camera in sync when the device rotates (portrait <-> landscape).
-    const onResize = () => {
+    onResize = () => {
       camera.aspect = innerWidth / innerHeight;
       camera.updateProjectionMatrix();
       renderer.setSize(innerWidth, innerHeight);
@@ -591,12 +597,20 @@ async function enterAR() {
                                           // via a plain rAF after the session ends, hammering
                                           // renderer.xr.getCamera() with no active XR frame and
                                           // spamming errors that were choking the gate's own UI.
+      window.removeEventListener('resize', onResize);
+      window.removeEventListener('orientationchange', onResize);
       xrSession = null;
       aligned = false;
       $('#overlay').style.display = 'none';
       $('#gate').style.display = 'flex';
       $('#enterBtn').textContent = 'Enter AR';
       if (renderer.domElement.parentNode) renderer.domElement.remove();
+      renderer.dispose();   // release the WebGL context — mobile browsers cap how many can be live at
+                             // once, and without this, re-entering AR after Exit AR could fail because
+                             // the previous session's context was still allocated in the background.
+      renderer = null;
+      scene = null;
+      camera = null;
     });
 
     $('#exitBtn').onclick = () => xrSession.end();
@@ -616,6 +630,9 @@ async function enterAR() {
     $('#gate').style.display = 'flex';
     $('#overlay').style.display = 'none';
     if (renderer && renderer.domElement && renderer.domElement.parentNode) renderer.domElement.remove();
+    if (renderer) { renderer.dispose(); renderer = null; }   // don't leak a WebGL context on a failed start either
+    window.removeEventListener('resize', onResize);
+    window.removeEventListener('orientationchange', onResize);
   }
 }
 
@@ -685,7 +702,13 @@ function render() {
       b.onScreen = onScreen;   // onSelect() only matches buildings that actually have a visible pin
 
       if (onScreen) {
-        onList.push({ b, x: cx + ndcX * cx, y: cy - ndcY * cy, op });
+        // Smooth toward the freshly computed position instead of snapping to it — device tracking
+        // (ARKit/ARCore) occasionally hiccups for a frame or two, and without smoothing that noise
+        // shows up as the pin instantly teleporting across the screen instead of gliding.
+        const tx = cx + ndcX * cx, ty = cy - ndcY * cy;
+        if (b.sx === undefined) { b.sx = tx; b.sy = ty; }
+        else { b.sx += (tx - b.sx) * POS_SMOOTH; b.sy += (ty - b.sy) * POS_SMOOTH; }
+        onList.push({ b, x: b.sx, y: b.sy, op });
       } else {
         b.labelEl.style.opacity = '0';
         // Bucket by 8-way direction so several off-screen buildings in the same general direction
