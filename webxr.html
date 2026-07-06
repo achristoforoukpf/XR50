@@ -122,8 +122,8 @@
   #infoCard { position:fixed; left:0; right:0; bottom:0; z-index:12; background:var(--kpf-paper); border-radius:14px 14px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .45s var(--ease-spring); box-shadow:0 -8px 30px rgba(0,0,0,.35); }
   #infoCard.open { transform:translateY(0); }
   #infoCard .close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; z-index:1; }
-  #infoCard .infoPhoto { width:100%; height:160px; border-radius:10px; margin-bottom:16px; overflow:hidden; background:#e3ded2; display:flex; align-items:center; justify-content:center; }
-  #infoCard .infoPhoto img { width:100%; height:100%; object-fit:contain; object-position:center; display:block; }
+  #infoCard .infoPhoto { width:100%; height:160px; margin-bottom:16px; display:flex; align-items:center; justify-content:center; }
+  #infoCard .infoPhoto img { max-width:100%; max-height:100%; width:auto; height:auto; border-radius:10px; display:block; }
   #infoCard .infoPhoto .placeholder { color:var(--kpf-meta); font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
   #infoCard h2 { color:var(--kpf-navy); font-size:24px; font-weight:700; letter-spacing:-.01em; margin-bottom:16px; padding-right:30px; }
   #infoCard .fields { display:grid; grid-template-columns:auto 1fr; gap:10px 18px; font-size:14px; margin:0 0 16px; }
@@ -151,7 +151,7 @@
 </head>
 <body>
 
-<div id="version">v5.7 · plain pins, no leader lines</div>
+<div id="version">v5.8 · info card photos, no fill</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
