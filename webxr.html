@@ -32,11 +32,13 @@
   #cover svg { display:block; width:100%; height:auto; }
   #gate > *:not(#cover):not(#coverPhoto) { position:relative; z-index:1; }
   @keyframes fadeUp { from{opacity:0; transform:translateY(14px);} to{opacity:1; transform:translateY(0);} }
-  #gate h1, #gate p.hook, #gate #howto, #gate #enterBtn { animation:fadeUp .7s var(--ease-out) both; }
+  #gate #annivBadge, #gate h1, #gate p.hook, #gate #howto, #gate #enterBtn { animation:fadeUp .7s var(--ease-out) both; }
+  #gate #annivBadge { animation-delay:0s; }
   #gate h1 { animation-delay:.05s; }
   #gate p.hook { animation-delay:.16s; }
   #gate #howto { animation-delay:.27s; }
   #gate #enterBtn { animation-delay:.38s; }
+  #annivBadge { display:inline-block; background:rgba(255,255,255,.14); border:1px solid rgba(255,255,255,.5); color:#fff; font-size:11px; font-weight:800; letter-spacing:.08em; text-transform:uppercase; padding:6px 14px; border-radius:20px; }
   #gate h1 { font-size:26px; font-weight:700; letter-spacing:-.01em; text-shadow:0 2px 12px rgba(0,0,0,.6); }
   #gate p { font-size:14px; opacity:.9; max-width:330px; line-height:1.5; text-shadow:0 1px 6px rgba(0,0,0,.6); }
   #gate p.hook { font-size:15px; opacity:.95; }
@@ -160,7 +162,7 @@
 </head>
 <body>
 
-<div id="version">v5.4 · fix stale demo tag, favicon, title</div>
+<div id="version">v5.5 · real heights/years, 50th anniversary badge</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -205,8 +207,9 @@
       </g>
     </svg>
   </div>
+  <div id="annivBadge">Celebrating 50 Years of KPF</div>
   <h1>KPF Skyline AR</h1>
-  <p class="hook">Hold your phone up to the skyline. Align once, and every KPF project pins itself in place — with a photo, project info, and a live view of exactly which tower is which.</p>
+  <p class="hook">Fifty years of KPF, fourteen towers across the skyline. Hold your phone up, align once, and every project pins itself in place — with a photo, project info, and a live view of exactly which tower is which.</p>
 
   <ol id="howto">
     <li><span class="n">1</span><span>Tap <b>Enter AR</b> and allow camera access.</span></li>
@@ -268,8 +271,8 @@
     <div id="confettiLayer"></div>
     <div id="completeCard">
       <div id="completeTrophy">🏆</div>
-      <h2>All 14 Found!</h2>
-      <p>You've discovered every KPF project visible from Edge. Nice work.</p>
+      <h2>50 Years, 14 Towers — Found Them All!</h2>
+      <p>You've discovered every KPF project visible from Edge. Happy 50th, KPF.</p>
       <button id="completeClose">Nice!</button>
     </div>
   </div>
@@ -309,37 +312,37 @@ function bearingDistance(lat1, lon1, lat2, lon2) {
 
 // ---- The real KPF projects, viewed from the Edge observation deck ----
 const ANCHOR = { lat: 40.75393935378195, lon: -74.00076274465533 };
-function edgeInfo(desc, year){ return { architect:"Kohn Pedersen Fox", year: year || "TBD", desc: desc || "Description pending." }; }
+function edgeInfo(desc, year, height){ return { architect:"Kohn Pedersen Fox", year: year || "TBD", height: height || "—", desc: desc || "Description pending." }; }
 const BUILDINGS = [
   { name:"Empire State Building", lat:40.748817, lon:-73.985428, anchorOnly:true },
   { name:"One Vanderbilt", lat:40.7528, lon:-73.9792, photo:"photos/one-vanderbilt.jpg", pos:"38% 32%",
-    info:edgeInfo("The tallest office tower in Midtown, One Vanderbilt connects directly to the city's transportation network, blending private enterprise and the public realm.", "2020") },
+    info:edgeInfo("The tallest office tower in Midtown, One Vanderbilt connects directly to the city's transportation network, blending private enterprise and the public realm.", "2020", "1,401 ft / 427 m") },
   { name:"5 Times Square", lat:40.7557, lon:-73.9874, photo:"photos/5-times-square.jpg",
-    info:edgeInfo("Located above one of New York's main subway hubs, 5 Times Square marks its location with an asymmetrical form to match the intersecting street patterns of the theater district.") },
+    info:edgeInfo("Located above one of New York's main subway hubs, 5 Times Square marks its location with an asymmetrical form to match the intersecting street patterns of the theater district.", "2002", "574 ft / 175 m") },
   { name:"520 Fifth Avenue", lat:40.7544, lon:-73.9805, photo:"photos/520-fifth-avenue.jpg", pos:"66% 45%",
-    info:edgeInfo("Located on Manhattan's most prestigious business and retail thoroughfare and designed with principles of sustainability, health, wellness, and connectivity, 520 Fifth Avenue is an 88-story vertical village that represents a new concept in luxury residential and boutique office space.") },
+    info:edgeInfo("Located on Manhattan's most prestigious business and retail thoroughfare and designed with principles of sustainability, health, wellness, and connectivity, 520 Fifth Avenue is an 88-story vertical village that represents a new concept in luxury residential and boutique office space.", "2025", "1,000 ft / 305 m") },
   { name:"2 Waterline Square", lat:40.7734, lon:-73.9912, photo:"photos/2-waterline-square.jpg",
-    info:edgeInfo("Through creative planning and massing adjustments within the strict confines of a previously approved scheme, KPF achieved the client's brief, weaving together 645 mixed-income units with plentiful outdoor space and amenities.") },
+    info:edgeInfo("Through creative planning and massing adjustments within the strict confines of a previously approved scheme, KPF achieved the client's brief, weaving together 645 mixed-income units with plentiful outdoor space and amenities.", "2019", "454 ft / 138 m") },
   { name:"55 Hudson Yards", lat:40.7556, lon:-74.0027, photo:"photos/55-hudson-yards.jpg",
-    info:edgeInfo("55 Hudson Yards synthesizes the contemporary, sleek forms of Manhattan's new mega-development with the industrial roots of its neighboring Meatpacking District.", "2019") },
+    info:edgeInfo("55 Hudson Yards synthesizes the contemporary, sleek forms of Manhattan's new mega-development with the industrial roots of its neighboring Meatpacking District.", "2019", "780 ft / 238 m") },
   { name:"10 Hudson Yards", lat:40.7541, lon:-74.0019, photo:"photos/10-hudson-yards.jpg",   // CSV note: double check these coordinates
-    info:edgeInfo("", "2019") },
-  { name:"20 Hudson Yards", lat:40.7534, lon:-74.0027, photo:"photos/20-hudson-yards.jpg", pos:"32% 55%",   // CSV note: update description
-    info:edgeInfo("Situated between 10 and 30 Hudson Yards, 20 Hudson Yards is home to The Shops and Restaurants at Hudson Yards, one of New York City's premiere locations for fashion and dining, elevating the standard for shopping in a dynamic, mixed-used setting.", "2019") },
+    info:edgeInfo("", "2017", "878 ft / 268 m") },
+  { name:"20 Hudson Yards", lat:40.7534, lon:-74.0027, photo:"photos/20-hudson-yards.jpg", pos:"32% 55%",
+    info:edgeInfo("Situated between 10 and 30 Hudson Yards, 20 Hudson Yards is home to The Shops and Restaurants at Hudson Yards, one of New York City's premiere locations for fashion and dining, elevating the standard for shopping in a dynamic, mixed-used setting.", "2019", "225 ft / 69 m") },
   { name:"One Madison Avenue", lat:40.7412, lon:-73.9869, photo:"photos/one-madison-avenue.jpg", pos:"88% 48%",
-    info:edgeInfo("With a design complementing its landmarked neighbor, the transformation of One Madison Avenue brings flexible, Class-A office space to Manhattan's Flatiron District.", "2024") },
+    info:edgeInfo("With a design complementing its landmarked neighbor, the transformation of One Madison Avenue brings flexible, Class-A office space to Manhattan's Flatiron District.", "2024", "470 ft / 143 m") },
   { name:"Madison Square Park Tower", lat:40.7398, lon:-73.9874, photo:"photos/madison-square-park-tower.jpg", pos:"60% 42%",
-    info:edgeInfo("Tapering skyward from Manhattan's Flatiron district, the Madison Square Park Tower's crystalline form creates varied floorplates, ample room for customization of unit layouts, and an unparalleled residential experience.") },
+    info:edgeInfo("Tapering skyward from Manhattan's Flatiron district, the Madison Square Park Tower's crystalline form creates varied floorplates, ample room for customization of unit layouts, and an unparalleled residential experience.", "2018", "777 ft / 237 m") },
   { name:"500 West 21st Street", lat:40.7464, lon:-74.0051, photo:"photos/500-west-21st-street.jpg",
-    info:edgeInfo("Situated along New York City's celebrated High Line, 500 West 21st Street is a luxury 8-story residential building that respects its context with both its scale and the refined character of its façades.") },
+    info:edgeInfo("Situated along New York City's celebrated High Line, 500 West 21st Street is a luxury 8-story residential building that respects its context with both its scale and the refined character of its façades.", "2015", "83 ft / 25 m") },
   { name:"Brooklyn Point", lat:40.6912, lon:-73.9825, photo:"photos/brooklyn-point.jpg", pos:"38% 72%",
-    info:edgeInfo("With its sculptural façade and eclectic materiality, Brooklyn Point sets a new standard for luxury living in Downtown Brooklyn while suiting the borough's renowned creative spirit.") },
+    info:edgeInfo("With its sculptural façade and eclectic materiality, Brooklyn Point sets a new standard for luxury living in Downtown Brooklyn while suiting the borough's renowned creative spirit.", "2021", "720 ft / 219 m") },
   { name:"111 Murray Street", lat:40.7154, lon:-74.0129, photo:"photos/111-murray-street.jpg", pos:"42% 40%",
-    info:edgeInfo("An elegant addition to downtown Manhattan, 111 Murray will set a new standard for luxury residential buildings, both inside and out, while contrasting its surroundings in height and disposition.") },
+    info:edgeInfo("An elegant addition to downtown Manhattan, 111 Murray will set a new standard for luxury residential buildings, both inside and out, while contrasting its surroundings in height and disposition.", "2019", "800 ft / 244 m") },
   { name:"388 Greenwich Street", lat:40.7206, lon:-74.0106, photo:"photos/388-greenwich-street.jpg",   // CSV note: needs a short description
-    info:edgeInfo("", "") },
+    info:edgeInfo("", "1989", "566 ft / 172 m") },
   { name:"Hudson Commons", lat:40.7539, lon:-73.9965, photo:"photos/hudson-commons.jpg",
-    info:edgeInfo("Situated at the gateway to the Hudson Yards submarket, this repositioned, LEED Platinum office tower maintains the expression of the site and neighborhood while attracting creative tenants to its new Class-A workspace.", "2018") },
+    info:edgeInfo("Situated at the gateway to the Hudson Yards submarket, this repositioned, LEED Platinum office tower maintains the expression of the site and neighborhood while attracting creative tenants to its new Class-A workspace.", "2019", "466 ft / 142 m") },
 ];
 BUILDINGS.forEach(b => { const bd=bearingDistance(ANCHOR.lat,ANCHOR.lon,b.lat,b.lon); b.bearing=bd.bearing; b.dist=bd.dist; });
 
@@ -478,7 +481,7 @@ function showInfo(b){
     ? `<img src="${b.photo}" alt="${b.name}" style="object-position:${b.pos || 'center'}">`
     : `<span class="placeholder">No photo yet</span>`;
   $('#infoFields').innerHTML = `<dt>Architect</dt><dd>${b.info.architect}</dd>
-    <dt>Completed</dt><dd>${b.info.year}</dd>`;
+    <dt>Completed</dt><dd>${b.info.year}</dd><dt>Height</dt><dd>${b.info.height}</dd>`;
   $('#infoDesc').textContent = b.info.desc;
   // Only flag it as pending when it genuinely is — most cards now have real photos/descriptions,
   // so a blanket "placeholder demo data" tag on every card was no longer accurate.
