@@ -65,6 +65,11 @@
   .arlabel .pinPhoto { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
   .arlabel .pinPhoto.placeholder { display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.55); font-size:22px; }
   .arlabel .pinTail { width:0; height:0; margin:-1px auto 0; border-left:9px solid transparent; border-right:9px solid transparent; border-top:14px solid #fff; }
+  /* Leader line — ties a pin floating above the skyline down to the actual building at the true
+     horizon, so it's never ambiguous which tower a pin refers to even when it's hovering well above
+     the roofline. A separate fixed element (not a child of .arlabel) since its height varies. */
+  .pinLeader { position:fixed; z-index:10; width:2px; transform:translateX(-50%); transform-origin:top; background:linear-gradient(to bottom, rgba(255,255,255,.65), rgba(255,255,255,.15)); pointer-events:none; display:none; }
+  .pinLeader::after { content:""; position:absolute; left:50%; bottom:-2px; width:6px; height:6px; border-radius:50%; background:rgba(255,255,255,.75); transform:translateX(-50%); }
   /* A fixed width + normal wrapping so long names (e.g. "Madison Square Park Tower") wrap onto a
      second line instead of spilling out as one long nowrap line past the 60px pin head — with a
      declared width, text-align:center is safe here (the earlier bug was specifically about
@@ -146,7 +151,7 @@
 </head>
 <body>
 
-<div id="version">v4.9 · pin name wrap, full 3-step guide</div>
+<div id="version">v5.0 · leader lines, tighter smoothing, drift nudge</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -396,6 +401,12 @@ const camRight = new THREE.Vector3();
 const camUp = new THREE.Vector3();
 let ignoreSelectUntil = 0;
 let aligned = false;
+let alignedAt = 0;
+let driftNudgeShown = false;
+const DRIFT_NUDGE_MS = 4 * 60 * 1000;   // ARKit/ARCore visual-inertial tracking can drift over a long
+                                         // session, especially panning across low-texture sky/haze —
+                                         // gently suggest Re-align after a few minutes rather than
+                                         // leaving people to notice pins are off on their own.
 let dirSign = 1;                   // flip if left/right ends up mirrored on this device
 
 // Build a session-space direction from a yaw (rad, clockwise from the align forward) + elevation.
@@ -410,8 +421,8 @@ function dirFromYaw(yaw, elevRad) {
 // Align on one recognizable building: aim the crosshair at it, tap its button. Its real bearing
 // becomes the anchor; every other label is placed at its own bearing offset from that.
 const PIN_ELEV = 5 * Math.PI / 180;   // pins hover at a fixed elevation above the skyline, not at each building's real bearing height
-const POS_SMOOTH = 0.18;   // 0-1, how much of the remaining distance to close each frame — lower = smoother but laggier
-const MAX_STEP_PX = 32;    // hard cap on pixels a pin can move in a single frame, regardless of how big the raw jump is
+const POS_SMOOTH = 0.13;   // 0-1, how much of the remaining distance to close each frame — lower = smoother but laggier
+const MAX_STEP_PX = 22;    // hard cap on pixels a pin can move in a single frame, regardless of how big the raw jump is
 const DIST_SCALE_NEAR = 400, DIST_SCALE_FAR = 3800;   // meters — pins at/under NEAR render full size, at/over FAR render at MIN_PIN_SCALE
 const MIN_PIN_SCALE = 0.62;
 
@@ -422,9 +433,12 @@ function alignOn(ref) {
   for (const b of BUILDINGS) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
     b.dir = dirFromYaw(refYaw + dTheta, b.anchorOnly ? 0 : PIN_ELEV).normalize();   // fixed DIRECTION (behaves like infinity)
+    b.dirGround = b.anchorOnly ? null : dirFromYaw(refYaw + dTheta, 0).normalize();   // same bearing at the true horizon — anchors the leader line to the actual building instead of floating pin with no visual tie to the skyline
     b.sx = undefined; b.sy = undefined;   // snap cleanly into the new alignment instead of gliding from the old one
   }
   aligned = true;
+  alignedAt = performance.now();
+  driftNudgeShown = false;
   setStatus(`Aligned on ${ref.name}! 🎯`, 2200);   // brief confirmation, then hand off to the Step 2 prompt below
   clearTimeout(stepTwoTimer);
   stepTwoTimer = setTimeout(() => {
@@ -804,6 +818,11 @@ function render() {
   camForward.set(-m[8], -m[9], -m[10]).normalize();
 
   if (aligned) {
+    if (!driftNudgeShown && performance.now() - alignedAt > DRIFT_NUDGE_MS) {
+      driftNudgeShown = true;
+      setStatus('Pins can drift on a long session — tap Re-align if a tower looks off.', 8000);
+    }
+
     // FOV half-tangents from the actual XR projection (per-eye camera if present).
     const proj = (xrCam.cameras && xrCam.cameras[0]) ? xrCam.cameras[0].projectionMatrix : camera.projectionMatrix;
     const tanH = 1 / proj.elements[0], tanV = 1 / proj.elements[5];
@@ -824,6 +843,7 @@ function render() {
         b.labelEl.addEventListener('click', (e) => { e.stopPropagation(); showInfo(b); });
         $('#overlay').appendChild(b.labelEl);
         b.pinHeadEl = b.labelEl.querySelector('.pinHead');   // cached so the focus glow below doesn't query the DOM every frame
+        b.leaderEl = document.createElement('div'); b.leaderEl.className = 'pinLeader'; $('#overlay').appendChild(b.leaderEl);
       }
       // Opacity: dim far buildings, brighten the one you're aiming toward ("approach" = look at it).
       // No manual fade-in ramp here — the CSS transition on .arlabel eases every opacity/transform
@@ -841,7 +861,7 @@ function render() {
       // flickers a building on/off-screen every other frame — and since the off-screen branch
       // doesn't update the smoothed position, each flicker let it go stale and then jump to catch
       // up the moment it flickered back on, which is what read as the pin "dancing" at the edge.
-      const EDGE_MARGIN = 0.1;
+      const EDGE_MARGIN = 0.18;
       const edgeThresh = b.onScreen ? 1 + EDGE_MARGIN : 1 - EDGE_MARGIN;
       const onScreen = fwd > 0 && Math.abs(ndcX) <= edgeThresh && Math.abs(ndcY) <= edgeThresh;
       b.onScreen = onScreen;   // onSelect() only matches buildings that actually have a visible pin
@@ -859,12 +879,21 @@ function render() {
           const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
           if (dist > 0.01) { b.sx += (dx / dist) * step; b.sy += (dy / dist) * step; }
         }
+        // Where this building's true horizon point (elevation 0) projects to right now, relative
+        // to its own raw target this frame — added onto the already-smoothed pin position below,
+        // so the leader line inherits the same jitter-resistance as the pin without needing its
+        // own separate smoothing state.
+        const fwdG = b.dirGround.dot(camForward), rightG = b.dirGround.dot(camRight), upG = b.dirGround.dot(camUp);
+        const ndcXG = fwdG > 0.05 ? (rightG/fwdG)/tanH : ndcX, ndcYG = fwdG > 0.05 ? (upG/fwdG)/tanV : ndcY;
+        b.leadDx = (cx + ndcXG * cx) - tx;
+        b.leadDy = (cy - ndcYG * cy) - ty;
       }
 
       if (onScreen) {
         onList.push({ b, x: b.sx, y: b.sy, op });
       } else {
         b.labelEl.style.opacity = '0';
+        b.leaderEl.style.display = 'none';
         // Bucket by 8-way direction so several off-screen buildings in the same general direction
         // collapse into one indicator instead of a pile of separate dots.
         let dx = fwd > 0.02 ? ndcX : right, dy = fwd > 0.02 ? ndcY : up;
@@ -926,6 +955,19 @@ function render() {
         it.b.pinHeadEl.style.boxShadow = focus > 0.08
           ? `0 0 ${(10 + 26 * focus).toFixed(0)}px rgba(255,255,255,${(0.25 + 0.45 * focus).toFixed(2)})`
           : 'none';
+      }
+      // Leader line from the pin's tip down to the true building position at the horizon —
+      // ties the floating pin to the actual tower instead of leaving it ambiguous in open sky.
+      const leader = it.b.leaderEl;
+      const leadDx = it.b.leadDx || 0, leadDy = it.b.leadDy || 0;
+      if (leader && leadDy > 4) {
+        leader.style.display = 'block';
+        leader.style.left = (it.x + leadDx) + 'px';
+        leader.style.top = it.y + 'px';
+        leader.style.height = leadDy + 'px';
+        leader.style.opacity = (it.op * seenFade).toFixed(3);
+      } else if (leader) {
+        leader.style.display = 'none';
       }
     }
   }
