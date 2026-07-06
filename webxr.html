@@ -28,6 +28,10 @@
   #gate p { font-size:14px; opacity:.9; max-width:330px; line-height:1.5; text-shadow:0 1px 6px rgba(0,0,0,.6); }
   #enterBtn { background:#fff; color:#0c2748; font-size:17px; font-weight:800; padding:16px 32px; border-radius:30px; border:none; box-shadow:0 6px 20px rgba(0,0,0,.4); }
   #enterBtn:disabled { opacity:.4; }
+  #modeToggle { display:flex; gap:8px; }
+  #modeToggle .modeBtn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.5); color:#fff; font-size:13px; font-weight:700; padding:9px 16px; border-radius:20px; }
+  #modeToggle .modeBtn.active { background:#fff; color:#0c2748; }
+  #modeBadge { position:fixed; top:calc(34px + env(safe-area-inset-top)); left:12px; z-index:13; background:rgba(255,255,255,.92); color:#0A1E42; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; border-radius:8px; }
   #unsupported { display:none; background:rgba(180,60,20,.92); padding:12px 14px; border-radius:12px; font-size:13px; max-width:330px; line-height:1.45; }
   #credit { position:absolute; bottom:calc(10px + env(safe-area-inset-bottom)); left:0; right:0; z-index:2; font-size:11px; opacity:.65; letter-spacing:.3px; }
 
@@ -41,7 +45,9 @@
   .arlabel .pinPhoto { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
   .arlabel .pinPhoto.placeholder { display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.55); font-size:22px; }
   .arlabel .pinTail { width:0; height:0; margin:-1px auto 0; border-left:9px solid transparent; border-right:9px solid transparent; border-top:14px solid #fff; }
-  .arlabel .pinName { margin-top:4px; text-align:center; font-size:11px; font-weight:600; color:#fff; text-shadow:0 1px 3px #000; white-space:nowrap; }
+  /* Absolutely positioned + translateX(-50%) so long names center on their true rendered width —
+     text-align:center on a nowrap block silently degrades to left-align once content overflows the 60px head. */
+  .arlabel .pinName { position:absolute; left:50%; top:78px; transform:translateX(-50%); font-size:11px; font-weight:600; color:#fff; text-shadow:0 1px 3px #000; white-space:nowrap; }
   #crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
   #crosshair::before, #crosshair::after { content:""; position:absolute; background:rgba(255,255,255,0.9); }
   #crosshair::before { width:2px; height:26px; left:-1px; top:-13px; }
@@ -84,7 +90,7 @@
 </head>
 <body>
 
-<div id="version">v3.2 · photo pins</div>
+<div id="version">v3.3 · office/edge modes</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -131,6 +137,11 @@
   </div>
   <h1>KPF Edge AR — WebXR</h1>
   <p>Real visual tracking on <b>Android</b> (ARCore) and <b>iPhone/iPad</b> (ARKit via Variant Launch — no app install). Labels are predefined: align once by aiming at a building you recognize and tapping it, and all labels snap into place and stay welded.</p>
+  <div id="modeToggle">
+    <button class="modeBtn active" data-mode="office">Office Mode</button>
+    <button class="modeBtn" data-mode="edge">Edge Mode</button>
+  </div>
+  <p style="font-size:12px;opacity:.7">Office Mode: 3 nearby test buildings, align on any of them. Edge Mode: the 14 real KPF projects, align on the Empire State Building.</p>
   <button id="enterBtn" disabled>Checking device…</button>
   <div id="unsupported">This device/browser doesn't support WebXR AR. Open this page in <b>Chrome on an Android phone</b>. (iPhones/iPads need the native app — Safari has no WebXR.)</div>
   <p style="font-size:12px;opacity:.6">After entering: slowly move the phone a moment so tracking initializes, aim the crosshair at a building you can identify, and tap its <b>Align</b> button.</p>
@@ -139,12 +150,13 @@
 
 <div id="overlay">
   <div id="crosshair"></div>
+  <div id="modeBadge">Office Mode</div>
   <div id="status">Move the phone slowly to start tracking, then aim at a building and tap its Align button…</div>
   <button id="exitBtn">Exit AR</button>
 
   <div id="alignGuide">
     <button class="close" id="alignGuideClose">&times;</button>
-    <svg viewBox="0 0 120 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+    <svg id="alignGuideDiagram" viewBox="0 0 120 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect x="12" y="120" width="96" height="42" fill="#3a4f74"/>
       <rect x="28" y="82"  width="64" height="38" fill="#33456a"/>
       <rect x="44" y="46"  width="32" height="36" fill="#2c3c5f"/>
@@ -154,7 +166,7 @@
       <circle cx="60" cy="46" r="2.2" fill="#ff4d4d"/>
       <text x="72" y="49" fill="#ff8a8a" font-size="12" font-weight="700" font-family="sans-serif">C</text>
     </svg>
-    <p>Aim the crosshair at the corner where the stepped roofline meets the base of the spire — then tap Align.</p>
+    <p id="alignGuideText"><b>Empire State Building</b> — aim the crosshair at the corner where the stepped roofline meets the base of the spire, then tap Align.</p>
   </div>
 
   <div id="placeBtns"></div>
@@ -172,6 +184,7 @@
 import * as THREE from 'https://unpkg.com/three@0.160.0/build/three.module.js';
 
 const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
 
 // If a cover.jpg exists in the repo, fade it in over the illustration (real photo override).
 (() => {
@@ -198,14 +211,6 @@ function info(i){ return {
   height:(400+i*120)+" ft (placeholder)",
   desc:BLURBS[i%BLURBS.length],
 };}
-// Predefined buildings — real coordinates. Bearing/distance are computed from the viewing spot
-// below, so at the party you only edit OFFICE + these coords, and labels auto-place.
-const OFFICE = { lat: 40.754157, lon: -73.981942 };   // viewing spot (set to the party location)
-const BUILDINGS = [
-  { name:"One Vanderbilt", lat:40.752282, lon:-73.982214, info:info(0), photo:"cover.jpg" },
-  { name:"Building 2", lat:40.753454, lon:-73.985334, info:info(1) },
-  { name:"Building 3", lat:40.754673, lon:-73.984757, info:info(2) },
-];
 function bearingDistance(lat1, lon1, lat2, lon2) {
   const rad = d => d*Math.PI/180;
   const p1=rad(lat1), p2=rad(lat2), dl=rad(lon2-lon1);
@@ -216,7 +221,60 @@ function bearingDistance(lat1, lon1, lat2, lon2) {
   const a=Math.sin(dp/2)**2+Math.cos(p1)*Math.cos(p2)*Math.sin(dl/2)**2;
   return { bearing, dist: 2*R*Math.asin(Math.sqrt(a)) };
 }
-BUILDINGS.forEach(b => { const bd=bearingDistance(OFFICE.lat,OFFICE.lon,b.lat,b.lon); b.bearing=bd.bearing; b.dist=bd.dist; });
+
+// ---- Office Mode: 3 nearby placeholder buildings for quick desk-side testing ----
+const OFFICE_ANCHOR = { lat: 40.754157, lon: -73.981942 };   // office viewing spot
+const BUILDINGS_OFFICE = [
+  { name:"One Vanderbilt", lat:40.752282, lon:-73.982214, info:info(0), photo:"cover.jpg" },
+  { name:"Building 2", lat:40.753454, lon:-73.985334, info:info(1) },
+  { name:"Building 3", lat:40.754673, lon:-73.984757, info:info(2) },
+];
+
+// ---- Edge Mode: the real KPF projects, viewed from the Edge observation deck ----
+// EDGE_ANCHOR is Edge's approximate location — confirm/adjust on site if pins drift.
+const EDGE_ANCHOR = { lat: 40.7538, lon: -74.0027 };
+function edgeInfo(desc, year){ return { architect:"Kohn Pedersen Fox", year: year || "TBD", height:"—", desc: desc || "Description pending." }; }
+const BUILDINGS_EDGE = [
+  { name:"Empire State Building", lat:40.748817, lon:-73.985428, anchorOnly:true },
+  { name:"One Vanderbilt", lat:40.7528, lon:-73.9792, photo:"cover.jpg",
+    info:edgeInfo("The tallest office tower in Midtown, One Vanderbilt connects directly to the city's transportation network, blending private enterprise and the public realm.", "2020") },
+  { name:"5 Times Square", lat:40.7557, lon:-73.9874,
+    info:edgeInfo("Located above one of New York's main subway hubs, 5 Times Square marks its location with an asymmetrical form to match the intersecting street patterns of the theater district.") },
+  { name:"520 Fifth Avenue", lat:40.7544, lon:-73.9805,
+    info:edgeInfo("Located on Manhattan's most prestigious business and retail thoroughfare and designed with principles of sustainability, health, wellness, and connectivity, 520 Fifth Avenue is an 88-story vertical village that represents a new concept in luxury residential and boutique office space.") },
+  { name:"2 Waterline Square", lat:40.7734, lon:-73.9912,
+    info:edgeInfo("Through creative planning and massing adjustments within the strict confines of a previously approved scheme, KPF achieved the client's brief, weaving together 645 mixed-income units with plentiful outdoor space and amenities.") },
+  { name:"55 Hudson Yards", lat:40.7556, lon:-74.0027,
+    info:edgeInfo("55 Hudson Yards synthesizes the contemporary, sleek forms of Manhattan's new mega-development with the industrial roots of its neighboring Meatpacking District.", "2019") },
+  { name:"10 Hudson Yards", lat:40.7541, lon:-74.0019,   // CSV note: double check these coordinates
+    info:edgeInfo("", "2019") },
+  { name:"20 Hudson Yards", lat:40.7534, lon:-74.0027,   // CSV note: update description
+    info:edgeInfo("Situated between 10 and 30 Hudson Yards, 20 Hudson Yards is home to The Shops and Restaurants at Hudson Yards, one of New York City's premiere locations for fashion and dining, elevating the standard for shopping in a dynamic, mixed-used setting.", "2019") },
+  { name:"One Madison Avenue", lat:40.7412, lon:-73.9869,
+    info:edgeInfo("With a design complementing its landmarked neighbor, the transformation of One Madison Avenue brings flexible, Class-A office space to Manhattan's Flatiron District.", "2024") },
+  { name:"Madison Square Park Tower", lat:40.7398, lon:-73.9874,
+    info:edgeInfo("Tapering skyward from Manhattan's Flatiron district, the Madison Square Park Tower's crystalline form creates varied floorplates, ample room for customization of unit layouts, and an unparalleled residential experience.") },
+  { name:"500 West 21st Street", lat:40.7464, lon:-74.0051,
+    info:edgeInfo("Situated along New York City's celebrated High Line, 500 West 21st Street is a luxury 8-story residential building that respects its context with both its scale and the refined character of its façades.") },
+  { name:"Brooklyn Point", lat:40.6912, lon:-73.9825,
+    info:edgeInfo("With its sculptural façade and eclectic materiality, Brooklyn Point sets a new standard for luxury living in Downtown Brooklyn while suiting the borough's renowned creative spirit.") },
+  { name:"111 Murray Street", lat:40.7154, lon:-74.0129,
+    info:edgeInfo("An elegant addition to downtown Manhattan, 111 Murray will set a new standard for luxury residential buildings, both inside and out, while contrasting its surroundings in height and disposition.") },
+  { name:"388 Greenwich Street", lat:40.7206, lon:-74.0106,   // CSV note: needs a short description
+    info:edgeInfo("", "") },
+  { name:"Hudson Commons", lat:40.7539, lon:-73.9965,
+    info:edgeInfo("Situated at the gateway to the Hudson Yards submarket, this repositioned, LEED Platinum office tower maintains the expression of the site and neighborhood while attracting creative tenants to its new Class-A workspace.", "2018") },
+];
+
+const MODES = {
+  office: { anchor: OFFICE_ANCHOR, buildings: BUILDINGS_OFFICE },
+  edge:   { anchor: EDGE_ANCHOR,   buildings: BUILDINGS_EDGE },
+};
+for (const m of Object.values(MODES)) {
+  m.buildings.forEach(b => { const bd=bearingDistance(m.anchor.lat,m.anchor.lon,b.lat,b.lon); b.bearing=bd.bearing; b.dist=bd.dist; });
+}
+let MODE = 'office';
+let BUILDINGS = MODES[MODE].buildings;
 
 let renderer, scene, camera, xrSession = null;
 const camPos = new THREE.Vector3();
@@ -299,7 +357,7 @@ function onSelect(){
   if (performance.now() < ignoreSelectUntil) return;   // ignore taps that were on buttons
   let best = null, bestDot = Math.cos(26 * Math.PI/180);
   for (const b of BUILDINGS) {
-    if (!b.dir) continue;
+    if (!b.dir || b.anchorOnly) continue;   // anchor-only entries (e.g. ESB) have no info card
     const d = b.dir.dot(camForward);
     if (d > bestDot) { bestDot = d; best = b; }
   }
@@ -307,33 +365,59 @@ function onSelect(){
 }
 
 // ---- Build the Align buttons (aim at a building you recognize, tap it) ----
+// Rebuilt whenever the mode changes, since Office/Edge use different building lists.
 const btnBox = $('#placeBtns');
-BUILDINGS.forEach(b => {
-  const btn = document.createElement('button');
-  btn.className = 'alignbtn';
-  btn.textContent = 'Align: ' + b.name;
-  b._btn = btn;
-  btn.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
-  btn.addEventListener('click', (e)=> { e.stopPropagation(); alignOn(b); });
-  btnBox.appendChild(btn);
-});
-// (Mirror toggle removed from the UI. To re-enable a left/right flip if a device ever mirrors,
-//  set `dirSign = -1` — the placement math still honors it.)
-// Re-align chip — shown after alignment; tap to bring the align buttons back.
-const reAlign = document.createElement('button');
-reAlign.id = 'reAlignChip';
-reAlign.textContent = 'Re-align';
-reAlign.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
-reAlign.addEventListener('click', (e)=> { e.stopPropagation(); btnBox.classList.remove('collapsed'); setStatus('Aim at a building you recognize and tap its Align button.'); showAlignGuide(); });
-btnBox.appendChild(reAlign);
+function rebuildAlignButtons(){
+  btnBox.innerHTML = '';
+  BUILDINGS.forEach(b => {
+    const btn = document.createElement('button');
+    btn.className = 'alignbtn';
+    btn.textContent = 'Align: ' + b.name;
+    b._btn = btn;
+    btn.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
+    btn.addEventListener('click', (e)=> { e.stopPropagation(); alignOn(b); });
+    btnBox.appendChild(btn);
+  });
+  // (Mirror toggle removed from the UI. To re-enable a left/right flip if a device ever mirrors,
+  //  set `dirSign = -1` — the placement math still honors it.)
+  // Re-align chip — shown after alignment; tap to bring the align buttons back.
+  const reAlign = document.createElement('button');
+  reAlign.id = 'reAlignChip';
+  reAlign.textContent = 'Re-align';
+  reAlign.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
+  reAlign.addEventListener('click', (e)=> { e.stopPropagation(); btnBox.classList.remove('collapsed'); setStatus('Aim at a building you recognize and tap its Align button.'); showAlignGuide(); });
+  btnBox.appendChild(reAlign);
 
-// Guide chip — reopen the alignment diagram after it's been closed or tucked away post-align.
-const guideChip = document.createElement('button');
-guideChip.id = 'guideChip';
-guideChip.textContent = 'Guide';
-guideChip.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
-guideChip.addEventListener('click', (e)=> { e.stopPropagation(); showAlignGuide(); });
-btnBox.appendChild(guideChip);
+  // Guide chip — reopen the alignment diagram after it's been closed or tucked away post-align.
+  const guideChip = document.createElement('button');
+  guideChip.id = 'guideChip';
+  guideChip.textContent = 'Guide';
+  guideChip.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
+  guideChip.addEventListener('click', (e)=> { e.stopPropagation(); showAlignGuide(); });
+  btnBox.appendChild(guideChip);
+}
+rebuildAlignButtons();
+
+// ---- Mode switch: Office (3 desk-test buildings) vs Edge (14 real KPF projects) ----
+function setMode(mode){
+  MODE = mode;
+  BUILDINGS = MODES[mode].buildings;
+  $$('#overlay .arlabel, #overlay .arrow').forEach(el => el.remove());   // drop stale pins from the other mode
+  BUILDINGS.forEach(b => { b.dir = null; b.labelEl = null; b.arrowEl = null; b.appear = 0; });
+  aligned = false;
+  rebuildAlignButtons();
+  btnBox.classList.remove('collapsed');
+  $$('.modeBtn').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
+  $('#modeBadge').textContent = mode === 'edge' ? 'Edge Mode' : 'Office Mode';
+  $('#alignGuideDiagram').style.display = mode === 'edge' ? 'block' : 'none';
+  $('#alignGuideText').innerHTML = mode === 'edge'
+    ? '<b>Empire State Building</b> — aim the crosshair at the corner where the stepped roofline meets the base of the spire, then tap Align.'
+    : 'Aim the crosshair at any building you recognize, then tap its Align button.';
+  setStatus(mode === 'edge'
+    ? 'Edge Mode — aim at the Empire State Building and tap its Align button.'
+    : 'Office Mode — aim at a building you recognize and tap its Align button.');
+}
+$$('.modeBtn').forEach(btn => btn.addEventListener('click', () => setMode(btn.dataset.mode)));
 
 function showAlignGuide(){ $('#alignGuide').style.display = 'block'; }
 function hideAlignGuide(){ $('#alignGuide').style.display = 'none'; }
@@ -483,7 +567,7 @@ function render() {
 
     const onList = [];
     for (const b of BUILDINGS) {
-      if (!b.dir) continue;
+      if (!b.dir || b.anchorOnly) continue;   // anchor-only entries (e.g. ESB) never get a pin
       // Lazily create the DOM pin + edge arrow for this building.
       if (!b.labelEl) {
         b.labelEl = document.createElement('div'); b.labelEl.className = 'arlabel';
