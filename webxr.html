@@ -3,7 +3,10 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-<title>KPF Edge AR — WebXR</title>
+<title>KPF Skyline AR</title>
+<meta name="theme-color" content="#0A1E42">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230A1E42'/%3E%3Cpath d='M32 12c-8 0-14 6-14 14 0 10 14 26 14 26s14-16 14-26c0-8-6-14-14-14z' fill='white'/%3E%3Ccircle cx='32' cy='26' r='6' fill='%230A1E42'/%3E%3C/svg%3E">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 64 64'%3E%3Crect width='64' height='64' rx='14' fill='%230A1E42'/%3E%3Cpath d='M32 12c-8 0-14 6-14 14 0 10 14 26 14 26s14-16 14-26c0-8-6-14-14-14z' fill='white'/%3E%3Ccircle cx='32' cy='26' r='6' fill='%230A1E42'/%3E%3C/svg%3E">
 <!-- Variant Launch: brings WebXR (ARKit) to iOS via App Clip. Must load before the engine code. -->
 <!-- NOTE: this key only works on domains authorised in the Variant dashboard (add achristoforoukpf.github.io). -->
 <script src="https://launchar.app/sdk/v1?key=uKq7kzTwBxF3sDhbii6wlP7SsIngRGDD&redirect=true"></script>
@@ -157,7 +160,7 @@
 </head>
 <body>
 
-<div id="version">v5.3 · tighter toxic-pink leader line</div>
+<div id="version">v5.4 · fix stale demo tag, favicon, title</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -258,7 +261,7 @@
     <dl class="fields" id="infoFields"></dl>
     <div class="desc" id="infoDesc"></div>
     <div id="celebrateBanner"></div>
-    <div class="tag">PLACEHOLDER DATA — demo only</div>
+    <div class="tag" style="display:none;">FULL WRITE-UP COMING SOON</div>
   </div>
 
   <div id="completeOverlay">
@@ -306,7 +309,7 @@ function bearingDistance(lat1, lon1, lat2, lon2) {
 
 // ---- The real KPF projects, viewed from the Edge observation deck ----
 const ANCHOR = { lat: 40.75393935378195, lon: -74.00076274465533 };
-function edgeInfo(desc, year){ return { architect:"Kohn Pedersen Fox", year: year || "TBD", height:"—", desc: desc || "Description pending." }; }
+function edgeInfo(desc, year){ return { architect:"Kohn Pedersen Fox", year: year || "TBD", desc: desc || "Description pending." }; }
 const BUILDINGS = [
   { name:"Empire State Building", lat:40.748817, lon:-73.985428, anchorOnly:true },
   { name:"One Vanderbilt", lat:40.7528, lon:-73.9792, photo:"photos/one-vanderbilt.jpg", pos:"38% 32%",
@@ -475,8 +478,11 @@ function showInfo(b){
     ? `<img src="${b.photo}" alt="${b.name}" style="object-position:${b.pos || 'center'}">`
     : `<span class="placeholder">No photo yet</span>`;
   $('#infoFields').innerHTML = `<dt>Architect</dt><dd>${b.info.architect}</dd>
-    <dt>Completed</dt><dd>${b.info.year}</dd><dt>Height</dt><dd>${b.info.height}</dd>`;
+    <dt>Completed</dt><dd>${b.info.year}</dd>`;
   $('#infoDesc').textContent = b.info.desc;
+  // Only flag it as pending when it genuinely is — most cards now have real photos/descriptions,
+  // so a blanket "placeholder demo data" tag on every card was no longer accurate.
+  $('#infoCard .tag').style.display = (b.info.desc === 'Description pending.') ? 'inline-block' : 'none';
   openInfoCard();
   const isNew = markDiscovered(b);
   const banner = $('#celebrateBanner');
