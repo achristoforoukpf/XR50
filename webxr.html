@@ -26,6 +26,11 @@
   #gate > *:not(#cover):not(#coverPhoto) { position:relative; z-index:1; }
   #gate h1 { font-size:26px; font-weight:700; letter-spacing:-.01em; text-shadow:0 2px 12px rgba(0,0,0,.6); }
   #gate p { font-size:14px; opacity:.9; max-width:330px; line-height:1.5; text-shadow:0 1px 6px rgba(0,0,0,.6); }
+  #gate p.hook { font-size:15px; opacity:.95; }
+  #gate p.modeHint, #gate p.techNote { font-size:12px; opacity:.65; }
+  #howto { list-style:none; text-align:left; max-width:330px; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
+  #howto li { display:flex; align-items:flex-start; gap:10px; font-size:14px; line-height:1.4; opacity:.95; text-shadow:0 1px 6px rgba(0,0,0,.6); }
+  #howto .n { flex:0 0 auto; width:20px; height:20px; margin-top:1px; border-radius:50%; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.55); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; }
   #enterBtn { background:#fff; color:#0c2748; font-size:17px; font-weight:800; padding:16px 32px; border-radius:30px; border:none; box-shadow:0 6px 20px rgba(0,0,0,.4); }
   #enterBtn:disabled { opacity:.4; }
   #modeToggle { display:flex; gap:8px; }
@@ -98,7 +103,7 @@
 </head>
 <body>
 
-<div id="version">v3.6 · clean top UI + progress reset</div>
+<div id="version">v3.7 · splash screen rewrite</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -143,16 +148,24 @@
       </g>
     </svg>
   </div>
-  <h1>KPF Edge AR — WebXR</h1>
-  <p>Real visual tracking on <b>Android</b> (ARCore) and <b>iPhone/iPad</b> (ARKit via Variant Launch — no app install). Labels are predefined: align once by aiming at a building you recognize and tapping it, and all labels snap into place and stay welded.</p>
+  <h1>KPF Skyline AR</h1>
+  <p class="hook">Hold your phone up to the skyline. Align once, and every KPF project pins itself in place — with a photo, project info, and a live view of exactly which tower is which.</p>
+
+  <ol id="howto">
+    <li><span class="n">1</span><span>Pick a mode below.</span></li>
+    <li><span class="n">2</span><span>Tap <b>Enter AR</b> and allow camera access.</span></li>
+    <li><span class="n">3</span><span>Move the phone a moment, aim at the landmark named on your <b>Align</b> button, and tap it.</span></li>
+    <li><span class="n">4</span><span>Pan the skyline — tap any pin for project details.</span></li>
+  </ol>
+
   <div id="modeToggle">
     <button class="modeBtn active" data-mode="office">Office Mode</button>
     <button class="modeBtn" data-mode="edge">Edge Mode</button>
   </div>
-  <p style="font-size:12px;opacity:.7">Office Mode: 3 nearby test buildings, align on any of them. Edge Mode: the 14 real KPF projects, align on the Empire State Building.</p>
+  <p class="modeHint">Office Mode: 3 nearby test buildings, align on any of them. Edge Mode: the 14 real KPF projects, align on the Empire State Building.</p>
   <button id="enterBtn" disabled>Checking device…</button>
   <div id="unsupported">This device/browser doesn't support WebXR AR. Open this page in <b>Chrome on an Android phone</b>. (iPhones/iPads need the native app — Safari has no WebXR.)</div>
-  <p style="font-size:12px;opacity:.6">After entering: slowly move the phone a moment so tracking initializes, aim the crosshair at a building you can identify, and tap its <b>Align</b> button.</p>
+  <p class="techNote">Real visual tracking on <b>Android</b> (ARCore) and <b>iPhone/iPad</b> (ARKit via Variant Launch — no app install).</p>
   <button id="resetProgressBtn" style="background:none;border:none;color:#fff;opacity:.55;font-size:12px;text-decoration:underline;padding:4px;">New guest on this device? Reset discovery progress</button>
   <div id="credit">Illustration — One Vanderbilt (KPF). Swap in an official photo via cover.jpg.</div>
 </div>
