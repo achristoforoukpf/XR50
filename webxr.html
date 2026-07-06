@@ -136,7 +136,7 @@
 </head>
 <body>
 
-<div id="version">v4.6 · team credit, verbose diagnostics</div>
+<div id="version">v4.7 · detect Chrome/in-app browser on iOS</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -192,7 +192,7 @@
 
   <button id="enterBtn" disabled>Checking device…</button>
   <div id="unsupported">This device/browser doesn't support WebXR AR. Open this page in <b>Chrome on an Android phone</b>. (iPhones/iPads need the native app — Safari has no WebXR.)</div>
-  <p class="techNote">Real visual tracking on <b>Android</b> (ARCore) and <b>iPhone/iPad</b> (ARKit via Variant Launch — no app install).</p>
+  <p class="techNote">Real visual tracking on <b>Android</b> (ARCore, in Chrome) and <b>iPhone/iPad</b> (ARKit via Variant Launch — no app install, but <b>Safari only</b>, not Chrome or an in-app browser).</p>
   <button id="resetProgressBtn" style="background:none;border:none;color:#fff;opacity:.55;font-size:12px;text-decoration:underline;padding:4px;">New guest on this device? Reset discovery progress</button>
   <div id="teamCredit">Made possible by KPF Applied Technology + Marketing</div>
   <div id="credit">Illustration — One Vanderbilt (KPF). Swap in an official photo via cover.jpg.</div>
@@ -555,7 +555,13 @@ function detectDevice() {
               (/Macintosh/.test(ua) && navigator.maxTouchPoints > 1);
   const android = /Android/.test(ua);
   const mobile = iOS || android || /Mobi/.test(ua) || navigator.maxTouchPoints > 1;
-  return { iOS, android, mobile };
+  // Variant Launch's App Clip hand-off is a Safari-only OS integration — Apple requires every iOS
+  // browser to use WebKit under the hood, but only Safari itself gets to invoke App Clips. Chrome,
+  // Firefox, and any in-app browser (Instagram/Facebook/etc.) on iOS can never launch this, no
+  // matter what this page does — so detect it and say so immediately instead of waiting for a
+  // 20s timeout to fail with a generic error.
+  const iosNonSafari = iOS && /CriOS|FxiOS|EdgiOS|OPiOS|FBAN|FBAV|Instagram|Line\/|MicroMessenger|GSA\//.test(ua);
+  return { iOS, android, mobile, iosNonSafari };
 }
 
 function showUnsupported(html) {
@@ -582,6 +588,18 @@ function diagBlock(supported, xrError){
 async function init() {
   const dev = detectDevice();
 
+  if (dev.iosNonSafari) {
+    showUnsupported(
+      "<b>Open this in Safari, not this browser.</b><br><br>" +
+      "On iPhone/iPad, AR only works in <b>Safari</b> — Apple doesn't let Chrome, Firefox, or " +
+      "in-app browsers (Instagram, Facebook, etc.) launch the AR viewer, even though they're " +
+      "built on the same engine. Tap the <b>•••</b> or share icon and choose " +
+      "<b>Open in Safari</b>, or copy this link into Safari directly." +
+      diagBlock(false, null)
+    );
+    return;
+  }
+
   // Variant Launch provides WebXR on iOS via App Clip. Give it a moment to polyfill navigator.xr
   // before we test support (its script loads in <head>). On iOS in plain Safari it will present
   // its launch flow; inside the Launch viewer, immersive-ar becomes supported.
@@ -601,7 +619,8 @@ async function init() {
   if (dev.iOS) {
     showUnsupported(
       "<b>Preparing AR…</b><br><br>" +
-      "On iPhone/iPad this launches through an instant AR viewer (no install). If a prompt/banner appears, tap it. " +
+      "On iPhone/iPad this launches through an instant AR viewer (no install) — make sure you're in " +
+      "<b>Safari</b> (not Chrome or an in-app browser). If a prompt/banner appears, tap it. " +
       "If nothing happens, make sure you opened this from the QR link, and that the site's domain is authorised in Variant Launch." +
       diag
     );
