@@ -44,8 +44,12 @@
   #enterBtn { background:#fff; color:#0c2748; font-size:17px; font-weight:800; padding:16px 32px; border-radius:30px; border:none; box-shadow:0 6px 20px rgba(0,0,0,.4); }
   #enterBtn:disabled { opacity:.4; }
   #unsupported { display:none; background:rgba(180,60,20,.92); padding:12px 14px; border-radius:12px; font-size:13px; max-width:330px; line-height:1.45; }
-  #credit { position:absolute; bottom:calc(10px + env(safe-area-inset-bottom)); left:0; right:0; z-index:2; font-size:11px; opacity:.65; letter-spacing:.3px; }
-  #teamCredit { position:absolute; bottom:calc(27px + env(safe-area-inset-bottom)); left:0; right:0; z-index:2; font-size:11px; font-weight:700; opacity:.75; letter-spacing:.3px; }
+  /* All bottom-of-gate text lives in one flow-based footer (not independently absolute-positioned)
+     so it can never overlap — each line just stacks below the last with a fixed gap, regardless of
+     how tall the content above it is on a given screen. */
+  #gateFooter { position:absolute; bottom:calc(10px + env(safe-area-inset-bottom)); left:0; right:0; z-index:2; display:flex; flex-direction:column; gap:6px; }
+  #credit { font-size:11px; opacity:.65; letter-spacing:.3px; }
+  #teamCredit { font-size:11px; font-weight:700; opacity:.75; letter-spacing:.3px; }
 
   /* DOM overlay (drawn over the AR camera feed) */
   #overlay { position:fixed; inset:0; z-index:10; display:none; }
@@ -94,7 +98,7 @@
   #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
   /* Alignment guide — shows where on the anchor building to aim before tapping Align. */
-  #alignGuide { position:fixed; left:12px; top:calc(134px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
+  #alignGuide { position:fixed; left:12px; top:calc(172px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
   #alignGuide svg { display:block; width:100%; height:auto; }
   #alignGuide p { font-size:11px; line-height:1.35; color:#fff; opacity:.92; margin-top:6px; }
   #alignGuide .close { position:absolute; top:2px; right:6px; background:none; border:none; color:#fff; opacity:.6; font-size:16px; padding:4px; }
@@ -136,7 +140,7 @@
 </head>
 <body>
 
-<div id="version">v4.7 · detect Chrome/in-app browser on iOS</div>
+<div id="version">v4.8 · fix footer + Step 1/guide overlap</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -193,15 +197,17 @@
   <button id="enterBtn" disabled>Checking device…</button>
   <div id="unsupported">This device/browser doesn't support WebXR AR. Open this page in <b>Chrome on an Android phone</b>. (iPhones/iPads need the native app — Safari has no WebXR.)</div>
   <p class="techNote">Real visual tracking on <b>Android</b> (ARCore, in Chrome) and <b>iPhone/iPad</b> (ARKit via Variant Launch — no app install, but <b>Safari only</b>, not Chrome or an in-app browser).</p>
-  <button id="resetProgressBtn" style="background:none;border:none;color:#fff;opacity:.55;font-size:12px;text-decoration:underline;padding:4px;">New guest on this device? Reset discovery progress</button>
-  <div id="teamCredit">Made possible by KPF Applied Technology + Marketing</div>
-  <div id="credit">Illustration — One Vanderbilt (KPF). Swap in an official photo via cover.jpg.</div>
+  <div id="gateFooter">
+    <button id="resetProgressBtn" style="background:none;border:none;color:#fff;opacity:.55;font-size:12px;text-decoration:underline;padding:4px;">New guest on this device? Reset discovery progress</button>
+    <div id="teamCredit">Made possible by KPF Applied Technology + Marketing</div>
+    <div id="credit">Illustration — One Vanderbilt (KPF). Swap in an official photo via cover.jpg.</div>
+  </div>
 </div>
 
 <div id="overlay">
   <div id="crosshair"></div>
   <div id="progressBadge"></div>
-  <div id="status">Step 1 — move the phone slowly to start tracking, then point at the Empire State Building and tap Align.</div>
+  <div id="status">Step 1 — move the phone, then point at the Empire State Building and tap Align.</div>
   <button id="exitBtn">Exit AR</button>
 
   <div id="alignGuide">
