@@ -27,16 +27,12 @@
   #gate h1 { font-size:26px; font-weight:700; letter-spacing:-.01em; text-shadow:0 2px 12px rgba(0,0,0,.6); }
   #gate p { font-size:14px; opacity:.9; max-width:330px; line-height:1.5; text-shadow:0 1px 6px rgba(0,0,0,.6); }
   #gate p.hook { font-size:15px; opacity:.95; }
-  #gate p.modeHint, #gate p.techNote { font-size:12px; opacity:.65; }
+  #gate p.techNote { font-size:12px; opacity:.65; }
   #howto { list-style:none; text-align:left; max-width:330px; margin:0; padding:0; display:flex; flex-direction:column; gap:9px; }
   #howto li { display:flex; align-items:flex-start; gap:10px; font-size:14px; line-height:1.4; opacity:.95; text-shadow:0 1px 6px rgba(0,0,0,.6); }
   #howto .n { flex:0 0 auto; width:20px; height:20px; margin-top:1px; border-radius:50%; background:rgba(255,255,255,.15); border:1px solid rgba(255,255,255,.55); display:flex; align-items:center; justify-content:center; font-size:11px; font-weight:800; }
   #enterBtn { background:#fff; color:#0c2748; font-size:17px; font-weight:800; padding:16px 32px; border-radius:30px; border:none; box-shadow:0 6px 20px rgba(0,0,0,.4); }
   #enterBtn:disabled { opacity:.4; }
-  #modeToggle { display:flex; gap:8px; }
-  #modeToggle .modeBtn { background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.5); color:#fff; font-size:13px; font-weight:700; padding:9px 16px; border-radius:20px; }
-  #modeToggle .modeBtn.active { background:#fff; color:#0c2748; }
-  #modeBadge { position:fixed; top:calc(34px + env(safe-area-inset-top)); left:12px; z-index:13; background:rgba(255,255,255,.92); color:#0A1E42; font-size:11px; font-weight:800; letter-spacing:.06em; text-transform:uppercase; padding:6px 10px; border-radius:8px; }
   #unsupported { display:none; background:rgba(180,60,20,.92); padding:12px 14px; border-radius:12px; font-size:13px; max-width:330px; line-height:1.45; }
   #credit { position:absolute; bottom:calc(10px + env(safe-area-inset-bottom)); left:0; right:0; z-index:2; font-size:11px; opacity:.65; letter-spacing:.3px; }
 
@@ -60,13 +56,20 @@
   /* Discovered state — a slight fade (applied via JS to the per-frame opacity) plus a checkmark badge. */
   .arlabel .pinCheck { display:none; position:absolute; top:-4px; right:-4px; width:18px; height:18px; border-radius:50%; background:#2ecc71; color:#fff; font-size:11px; font-weight:800; align-items:center; justify-content:center; border:2px solid #fff; }
   .arlabel.discovered .pinCheck { display:flex; }
-  #progressBadge { position:fixed; top:calc(64px + env(safe-area-inset-top)); left:12px; z-index:13; background:rgba(255,255,255,.92); color:#0A1E42; font-size:11px; font-weight:800; letter-spacing:.04em; padding:6px 10px; border-radius:8px; display:none; }
+  /* Celebration: a quick bounce on the checkmark + an expanding ring, played once when a building
+     is newly discovered (not on every re-render, so it doesn't replay while just panning around). */
+  @keyframes pinCheckPop { 0%{transform:scale(0.3);opacity:0;} 55%{transform:scale(1.4);opacity:1;} 100%{transform:scale(1);opacity:1;} }
+  @keyframes pinRingPulse { 0%{transform:scale(0.7);opacity:.9;} 100%{transform:scale(2.4);opacity:0;} }
+  .arlabel.celebrate .pinCheck { animation: pinCheckPop .5s ease-out; }
+  .arlabel .pinRing { position:absolute; inset:-4px; border-radius:50%; border:2px solid #2ecc71; pointer-events:none; opacity:0; }
+  .arlabel.celebrate .pinRing { animation: pinRingPulse .7s ease-out; }
+  #progressBadge { position:fixed; top:calc(34px + env(safe-area-inset-top)); left:12px; z-index:13; background:rgba(255,255,255,.92); color:#0A1E42; font-size:11px; font-weight:800; letter-spacing:.04em; padding:6px 10px; border-radius:8px; display:none; }
   #crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
   #crosshair::before, #crosshair::after { content:""; position:absolute; background:rgba(255,255,255,0.9); }
   #crosshair::before { width:2px; height:26px; left:-1px; top:-13px; }
   #crosshair::after  { height:2px; width:26px; top:-1px; left:-13px; }
 
-  #status { position:fixed; top:calc(104px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:13; max-width:min(78%, 340px); text-align:center; font-size:12.5px; font-weight:600; line-height:1.4; color:#fff; background:rgba(10,30,66,0.78); padding:7px 14px; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.35); transition:opacity .6s ease; }
+  #status { position:fixed; top:calc(74px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); z-index:13; max-width:min(78%, 340px); text-align:center; font-size:12.5px; font-weight:600; line-height:1.4; color:#fff; background:rgba(10,30,66,0.78); padding:7px 14px; border-radius:14px; box-shadow:0 2px 10px rgba(0,0,0,.35); transition:opacity .6s ease; }
 
   #placeBtns { position:fixed; left:0; right:0; bottom:calc(20px + env(safe-area-inset-bottom)); display:flex; gap:8px; justify-content:center; flex-wrap:wrap; padding:0 12px; }
   #placeBtns button { background:rgba(10,30,66,0.92); border:1.5px solid #fff; color:#fff; font-size:14px; font-weight:600; padding:12px 16px; border-radius:24px; box-shadow:0 3px 10px rgba(0,0,0,.5); }
@@ -79,7 +82,7 @@
   #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
   /* Alignment guide — shows where on the anchor building to aim before tapping Align. */
-  #alignGuide { position:fixed; left:12px; top:calc(164px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
+  #alignGuide { position:fixed; left:12px; top:calc(134px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
   #alignGuide svg { display:block; width:100%; height:auto; }
   #alignGuide p { font-size:11px; line-height:1.35; color:#fff; opacity:.92; margin-top:6px; }
   #alignGuide .close { position:absolute; top:2px; right:6px; background:none; border:none; color:#fff; opacity:.6; font-size:16px; padding:4px; }
@@ -99,11 +102,14 @@
   #infoCard .fields dd { color:var(--kpf-navy); font-weight:500; }
   #infoCard .desc { font-size:14px; line-height:1.55; color:var(--kpf-body); border-top:1px solid var(--kpf-rule); padding-top:14px; }
   #infoCard .tag { display:inline-block; margin-top:12px; text-transform:uppercase; letter-spacing:.08em; font-size:10px; padding:3px 8px; border-radius:6px; background:#f2ede3; color:#9a6a1e; font-weight:700; }
+  @keyframes celebrateIn { 0%{transform:scale(0.85);opacity:0;} 100%{transform:scale(1);opacity:1;} }
+  #celebrateBanner { display:none; margin-top:14px; padding:10px 14px; border-radius:10px; background:#eafaf0; color:#1a7a45; font-weight:700; font-size:14px; }
+  #celebrateBanner.show { display:block; animation:celebrateIn .4s ease-out; }
 </style>
 </head>
 <body>
 
-<div id="version">v3.9 · fixes: re-enter AR, pin jitter, card close</div>
+<div id="version">v4.0 · Edge-only, depth + celebration</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -152,17 +158,11 @@
   <p class="hook">Hold your phone up to the skyline. Align once, and every KPF project pins itself in place — with a photo, project info, and a live view of exactly which tower is which.</p>
 
   <ol id="howto">
-    <li><span class="n">1</span><span>Pick a mode below.</span></li>
-    <li><span class="n">2</span><span>Tap <b>Enter AR</b> and allow camera access.</span></li>
-    <li><span class="n">3</span><span>Move the phone a moment, aim at the landmark named on your <b>Align</b> button, and tap it.</span></li>
-    <li><span class="n">4</span><span>Pan the skyline — tap any pin for project details.</span></li>
+    <li><span class="n">1</span><span>Tap <b>Enter AR</b> and allow camera access.</span></li>
+    <li><span class="n">2</span><span>Move the phone a moment, aim at the Empire State Building, and tap <b>Align</b>.</span></li>
+    <li><span class="n">3</span><span>Pan the skyline — tap any pin for project details.</span></li>
   </ol>
 
-  <div id="modeToggle">
-    <button class="modeBtn active" data-mode="office">Office Mode</button>
-    <button class="modeBtn" data-mode="edge">Edge Mode</button>
-  </div>
-  <p class="modeHint">Office Mode: 3 nearby test buildings, align on any of them. Edge Mode: the 14 real KPF projects, align on the Empire State Building.</p>
   <button id="enterBtn" disabled>Checking device…</button>
   <div id="unsupported">This device/browser doesn't support WebXR AR. Open this page in <b>Chrome on an Android phone</b>. (iPhones/iPads need the native app — Safari has no WebXR.)</div>
   <p class="techNote">Real visual tracking on <b>Android</b> (ARCore) and <b>iPhone/iPad</b> (ARKit via Variant Launch — no app install).</p>
@@ -172,7 +172,6 @@
 
 <div id="overlay">
   <div id="crosshair"></div>
-  <div id="modeBadge">Office Mode</div>
   <div id="progressBadge"></div>
   <div id="status">Move the phone slowly to start tracking, then aim at a building and tap its Align button…</div>
   <button id="exitBtn">Exit AR</button>
@@ -199,6 +198,7 @@
     <h2 id="infoName">—</h2>
     <dl class="fields" id="infoFields"></dl>
     <div class="desc" id="infoDesc"></div>
+    <div id="celebrateBanner"></div>
     <div class="tag">PLACEHOLDER DATA — demo only</div>
   </div>
 </div>
@@ -222,18 +222,6 @@ const $$ = s => document.querySelectorAll(s);
   img.src = 'cover.jpg';
 })();
 
-// ---- Buildings (names + placeholder info; in WebXR we place by aim, not coordinates) ----
-const BLURBS = [
-  "Placeholder description — real project write-up, photography, and credits would load here from KPF's database.",
-  "Demo copy only. Production would pull scope, completion date, awards, and design narrative per building.",
-  "Sample text for the info-card layout. Real content (renderings, stats, press) would appear here.",
-];
-function info(i){ return {
-  architect:"Kohn Pedersen Fox (placeholder)",
-  year:[2011,2016,2019][i%3]+" (placeholder)",
-  height:(400+i*120)+" ft (placeholder)",
-  desc:BLURBS[i%BLURBS.length],
-};}
 function bearingDistance(lat1, lon1, lat2, lon2) {
   const rad = d => d*Math.PI/180;
   const p1=rad(lat1), p2=rad(lat2), dl=rad(lon2-lon1);
@@ -245,19 +233,10 @@ function bearingDistance(lat1, lon1, lat2, lon2) {
   return { bearing, dist: 2*R*Math.asin(Math.sqrt(a)) };
 }
 
-// ---- Office Mode: 3 nearby placeholder buildings for quick desk-side testing ----
-const OFFICE_ANCHOR = { lat: 40.754157, lon: -73.981942 };   // office viewing spot
-const BUILDINGS_OFFICE = [
-  { name:"One Vanderbilt", lat:40.752282, lon:-73.982214, info:info(0), photo:"cover.jpg" },
-  { name:"Building 2", lat:40.753454, lon:-73.985334, info:info(1) },
-  { name:"Building 3", lat:40.754673, lon:-73.984757, info:info(2) },
-];
-
-// ---- Edge Mode: the real KPF projects, viewed from the Edge observation deck ----
-// EDGE_ANCHOR is Edge's approximate location — confirm/adjust on site if pins drift.
-const EDGE_ANCHOR = { lat: 40.7538, lon: -74.0027 };
+// ---- The real KPF projects, viewed from the Edge observation deck ----
+const ANCHOR = { lat: 40.75393935378195, lon: -74.00076274465533 };
 function edgeInfo(desc, year){ return { architect:"Kohn Pedersen Fox", year: year || "TBD", height:"—", desc: desc || "Description pending." }; }
-const BUILDINGS_EDGE = [
+const BUILDINGS = [
   { name:"Empire State Building", lat:40.748817, lon:-73.985428, anchorOnly:true },
   { name:"One Vanderbilt", lat:40.7528, lon:-73.9792, photo:"photos/one-vanderbilt.jpg", pos:"38% 32%",
     info:edgeInfo("The tallest office tower in Midtown, One Vanderbilt connects directly to the city's transportation network, blending private enterprise and the public realm.", "2020") },
@@ -288,27 +267,19 @@ const BUILDINGS_EDGE = [
   { name:"Hudson Commons", lat:40.7539, lon:-73.9965, photo:"photos/hudson-commons.jpg",
     info:edgeInfo("Situated at the gateway to the Hudson Yards submarket, this repositioned, LEED Platinum office tower maintains the expression of the site and neighborhood while attracting creative tenants to its new Class-A workspace.", "2018") },
 ];
-
-const MODES = {
-  office: { anchor: OFFICE_ANCHOR, buildings: BUILDINGS_OFFICE },
-  edge:   { anchor: EDGE_ANCHOR,   buildings: BUILDINGS_EDGE },
-};
-for (const m of Object.values(MODES)) {
-  m.buildings.forEach(b => { const bd=bearingDistance(m.anchor.lat,m.anchor.lon,b.lat,b.lon); b.bearing=bd.bearing; b.dist=bd.dist; });
-}
-let MODE = 'office';
-let BUILDINGS = MODES[MODE].buildings;
+BUILDINGS.forEach(b => { const bd=bearingDistance(ANCHOR.lat,ANCHOR.lon,b.lat,b.lon); b.bearing=bd.bearing; b.dist=bd.dist; });
 
 // ---- Discovery tracking ("gamification"): remember which buildings have had their card opened ----
 const DISCOVERED_KEY = 'xr50_discovered';
 let discovered = new Set(JSON.parse(localStorage.getItem(DISCOVERED_KEY) || '[]'));
 function isDiscovered(b){ return discovered.has(b.name); }
 function markDiscovered(b){
-  if (b.anchorOnly || discovered.has(b.name)) return;
+  if (b.anchorOnly || discovered.has(b.name)) return false;
   discovered.add(b.name);
   localStorage.setItem(DISCOVERED_KEY, JSON.stringify([...discovered]));
-  if (b.labelEl) b.labelEl.classList.add('discovered');
+  if (b.labelEl) b.labelEl.classList.add('discovered', 'celebrate');   // 'celebrate' plays the pop/ring once
   updateProgressBadge();
+  return true;
 }
 function updateProgressBadge(){
   const real = BUILDINGS.filter(b => !b.anchorOnly);
@@ -323,7 +294,7 @@ function updateProgressBadge(){
 $('#resetProgressBtn').addEventListener('click', () => {
   discovered.clear();
   localStorage.removeItem(DISCOVERED_KEY);
-  for (const b of [...BUILDINGS_OFFICE, ...BUILDINGS_EDGE]) {
+  for (const b of BUILDINGS) {
     if (b.labelEl) b.labelEl.classList.remove('discovered');
   }
   updateProgressBadge();
@@ -352,7 +323,10 @@ function dirFromYaw(yaw, elevRad) {
 // Align on one recognizable building: aim the crosshair at it, tap its button. Its real bearing
 // becomes the anchor; every other label is placed at its own bearing offset from that.
 const PIN_ELEV = 5 * Math.PI / 180;   // pins hover at a fixed elevation above the skyline, not at each building's real bearing height
-const POS_SMOOTH = 0.22;   // 0-1, how much of the remaining distance to close each frame — lower = smoother but laggier
+const POS_SMOOTH = 0.18;   // 0-1, how much of the remaining distance to close each frame — lower = smoother but laggier
+const MAX_STEP_PX = 32;    // hard cap on pixels a pin can move in a single frame, regardless of how big the raw jump is
+const DIST_SCALE_NEAR = 400, DIST_SCALE_FAR = 3800;   // meters — pins at/under NEAR render full size, at/over FAR render at MIN_PIN_SCALE
+const MIN_PIN_SCALE = 0.62;
 
 function alignOn(ref) {
   if (camForward.lengthSq() === 0) { setStatus('Tracking not ready — move the phone a moment.'); return; }
@@ -388,11 +362,19 @@ function showInfo(b){
     <dt>Completed</dt><dd>${b.info.year}</dd><dt>Height</dt><dd>${b.info.height}</dd>`;
   $('#infoDesc').textContent = b.info.desc;
   $('#infoCard').classList.add('open');
-  markDiscovered(b);
+  const isNew = markDiscovered(b);
+  const banner = $('#celebrateBanner');
+  if (isNew) {
+    const total = BUILDINGS.filter(x => !x.anchorOnly).length;
+    banner.textContent = `🎉 New discovery! ${discovered.size} / ${total} found.`;
+    banner.classList.add('show');
+  } else {
+    banner.classList.remove('show');
+  }
 }
 // stopPropagation here so the swipe-to-dismiss handler below (bound to the whole card) never sees
 // this pointerdown and starts a drag — without it, tapping × could get swallowed by pointer capture.
-$('#infoClose').addEventListener('pointerdown', (e) => e.stopPropagation());
+$('#infoClose').addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
 $('#infoClose').addEventListener('click', ()=> $('#infoCard').classList.remove('open'));
 
 // Swipe-down to dismiss the info card.
@@ -434,14 +416,12 @@ function onSelect(){
 }
 
 // ---- Build the Align buttons (aim at a building you recognize, tap it) ----
-// Rebuilt whenever the mode changes, since Office/Edge use different building lists.
 const btnBox = $('#placeBtns');
 function rebuildAlignButtons(){
   btnBox.innerHTML = '';
-  // Edge Mode has one true anchor (ESB) — every other building falls in from its own known bearing
-  // once that's set, so it doesn't get its own Align button. Office Mode keeps all buildings
-  // alignable since none of them is a fixed "the" anchor for quick desk testing.
-  const alignable = MODE === 'edge' ? BUILDINGS.filter(b => b.anchorOnly) : BUILDINGS;
+  // There's one true anchor (ESB) — every other building falls in from its own known bearing once
+  // that's set, so it doesn't get its own Align button.
+  const alignable = BUILDINGS.filter(b => b.anchorOnly);
   alignable.forEach(b => {
     const btn = document.createElement('button');
     btn.className = 'alignbtn';
@@ -471,29 +451,6 @@ function rebuildAlignButtons(){
 }
 rebuildAlignButtons();
 updateProgressBadge();
-
-// ---- Mode switch: Office (3 desk-test buildings) vs Edge (14 real KPF projects) ----
-function setMode(mode){
-  MODE = mode;
-  BUILDINGS = MODES[mode].buildings;
-  $$('#overlay .arlabel, #overlay .arrow').forEach(el => el.remove());   // drop stale pins from the other mode
-  Object.keys(arrowPool).forEach(k => delete arrowPool[k]);              // arrow elements above were just removed from the DOM — drop the stale cache too
-  BUILDINGS.forEach(b => { b.dir = null; b.labelEl = null; b.onScreen = false; b.sx = undefined; b.sy = undefined; });
-  aligned = false;
-  rebuildAlignButtons();
-  btnBox.classList.remove('collapsed');
-  $$('.modeBtn').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === mode));
-  $('#modeBadge').textContent = mode === 'edge' ? 'Edge Mode' : 'Office Mode';
-  updateProgressBadge();
-  $('#alignGuideDiagram').style.display = mode === 'edge' ? 'block' : 'none';
-  $('#alignGuideText').innerHTML = mode === 'edge'
-    ? '<b>Empire State Building</b> — aim the crosshair at the corner where the stepped roofline meets the base of the spire, then tap Align.'
-    : 'Aim the crosshair at any building you recognize, then tap its Align button.';
-  setStatus(mode === 'edge'
-    ? 'Edge Mode — aim at the Empire State Building and tap its Align button.'
-    : 'Office Mode — aim at a building you recognize and tap its Align button.');
-}
-$$('.modeBtn').forEach(btn => btn.addEventListener('click', () => setMode(btn.dataset.mode)));
 
 function showAlignGuide(){ $('#alignGuide').style.display = 'block'; }
 function hideAlignGuide(){ $('#alignGuide').style.display = 'none'; }
@@ -683,7 +640,7 @@ function render() {
         b.labelEl = document.createElement('div'); b.labelEl.className = 'arlabel';
         if (isDiscovered(b)) b.labelEl.classList.add('discovered');
         const photoInner = b.photo ? `<img class="pinPhoto" src="${b.photo}" alt="${b.name}" style="object-position:${b.pos || 'center'}">` : `<div class="pinPhoto placeholder">📍</div>`;
-        b.labelEl.innerHTML = `<div class="pinHead">${photoInner}</div><div class="pinCheck">✓</div><div class="pinTail"></div><div class="pinName">${b.name}</div>`;
+        b.labelEl.innerHTML = `<div class="pinHead">${photoInner}</div><div class="pinRing"></div><div class="pinCheck">✓</div><div class="pinTail"></div><div class="pinName">${b.name}</div>`;
         b.labelEl.addEventListener('pointerdown', () => { ignoreSelectUntil = performance.now() + 500; });
         b.labelEl.addEventListener('click', (e) => { e.stopPropagation(); showInfo(b); });
         $('#overlay').appendChild(b.labelEl);
@@ -704,10 +661,17 @@ function render() {
       if (onScreen) {
         // Smooth toward the freshly computed position instead of snapping to it — device tracking
         // (ARKit/ARCore) occasionally hiccups for a frame or two, and without smoothing that noise
-        // shows up as the pin instantly teleporting across the screen instead of gliding.
+        // shows up as the pin instantly teleporting across the screen. A plain exponential ease
+        // still lets one huge single-frame glitch move the pin most of the way there instantly
+        // (22% of a 1000px jump is still 220px), so also hard-clamp how far it can move in one
+        // frame — normal panning is well under this, but a tracking glitch can't teleport it.
         const tx = cx + ndcX * cx, ty = cy - ndcY * cy;
         if (b.sx === undefined) { b.sx = tx; b.sy = ty; }
-        else { b.sx += (tx - b.sx) * POS_SMOOTH; b.sy += (ty - b.sy) * POS_SMOOTH; }
+        else {
+          const dx = tx - b.sx, dy = ty - b.sy, dist = Math.hypot(dx, dy);
+          const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
+          if (dist > 0.01) { b.sx += (dx / dist) * step; b.sy += (dy / dist) * step; }
+        }
         onList.push({ b, x: b.sx, y: b.sy, op });
       } else {
         b.labelEl.style.opacity = '0';
@@ -762,7 +726,10 @@ function render() {
       el.style.top = it.y + 'px';
       const seenFade = el.classList.contains('discovered') ? 0.55 : 1;   // slight fade once you've opened its card
       el.style.opacity = (it.op * seenFade).toFixed(3);
-      el.style.transform = 'translate(-50%,-100%) scale(1)';   // pin tip anchors the point, not its center; CSS eases the pop-in from the 0.85 default
+      // Closer buildings render a bit bigger than farther ones — a subtle depth hierarchy instead
+      // of every pin reading as the same size regardless of how far away the actual tower is.
+      const distScale = clamp(1 - (it.b.dist - DIST_SCALE_NEAR) / (DIST_SCALE_FAR - DIST_SCALE_NEAR), 0, 1) * (1 - MIN_PIN_SCALE) + MIN_PIN_SCALE;
+      el.style.transform = `translate(-50%,-100%) scale(${distScale.toFixed(3)})`;   // pin tip anchors the point, not its center; CSS eases the pop-in from the 0.85 default
     }
   }
   renderer.render(scene, camera);
