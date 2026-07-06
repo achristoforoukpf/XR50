@@ -135,7 +135,7 @@
 </head>
 <body>
 
-<div id="version">v4.3 · fix pin edge-jitter, guided steps</div>
+<div id="version">v4.4 · Step 2 mentions tapping pins</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -409,7 +409,7 @@ function alignOn(ref) {
   setStatus(`Aligned on ${ref.name}! 🎯`, 2200);   // brief confirmation, then hand off to the Step 2 prompt below
   clearTimeout(stepTwoTimer);
   stepTwoTimer = setTimeout(() => {
-    setStatus('Step 2 — scan the skyline. Can you find all 14 KPF projects?', 7000);
+    setStatus('Step 2 — scan the skyline and tap any pin for project info. Can you find all 14 KPF projects?', 7500);
   }, 2600);
   $('#placeBtns').classList.add('collapsed');                             // tuck the align buttons into a Re-align chip
   hideAlignGuide();
