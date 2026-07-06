@@ -35,7 +35,13 @@
   #overlay { position:fixed; inset:0; z-index:10; display:none; }
   .arrow { position:fixed; z-index:11; transform:translate(-50%,-50%); background:rgba(10,30,66,0.82); border:1px solid rgba(255,255,255,0.5); color:#fff; font-size:12px; font-weight:600; padding:5px 9px; border-radius:14px; white-space:nowrap; pointer-events:none; display:none; box-shadow:0 2px 8px rgba(0,0,0,.4); }
   /* Welded labels are DOM (crisp on all devices — the 3D canvas texture was blurred by iOS's reduced-res WebGL layer) */
-  .arlabel { position:fixed; z-index:11; transform:translate(-50%,-50%); background:rgba(10,30,66,0.86); border:1px solid rgba(255,255,255,0.55); color:#fff; font-size:14px; font-weight:600; letter-spacing:.005em; padding:7px 13px; border-radius:20px; white-space:nowrap; pointer-events:auto; display:none; box-shadow:0 2px 10px rgba(0,0,0,.45); }
+  /* Pin label: a map-pin with the project photo nested in the head, tail pointing at the building. */
+  .arlabel { position:fixed; z-index:11; width:60px; transform:translate(-50%,-100%); pointer-events:auto; display:none; filter:drop-shadow(0 3px 8px rgba(0,0,0,.5)); }
+  .arlabel .pinHead { position:relative; width:60px; height:60px; border-radius:50%; background:rgba(10,30,66,0.9); border:3px solid #fff; overflow:hidden; }
+  .arlabel .pinPhoto { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+  .arlabel .pinPhoto.placeholder { display:flex; align-items:center; justify-content:center; color:rgba(255,255,255,.55); font-size:22px; }
+  .arlabel .pinTail { width:0; height:0; margin:-1px auto 0; border-left:9px solid transparent; border-right:9px solid transparent; border-top:14px solid #fff; }
+  .arlabel .pinName { margin-top:4px; text-align:center; font-size:11px; font-weight:600; color:#fff; text-shadow:0 1px 3px #000; white-space:nowrap; }
   #crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; }
   #crosshair::before, #crosshair::after { content:""; position:absolute; background:rgba(255,255,255,0.9); }
   #crosshair::before { width:2px; height:26px; left:-1px; top:-13px; }
@@ -53,10 +59,21 @@
 
   #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
+  /* Alignment guide — shows where on the anchor building to aim before tapping Align. */
+  #alignGuide { position:fixed; left:12px; top:calc(68px + env(safe-area-inset-top)); width:132px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
+  #alignGuide svg { display:block; width:100%; height:auto; }
+  #alignGuide p { font-size:11px; line-height:1.35; color:#fff; opacity:.92; margin-top:6px; }
+  #alignGuide .close { position:absolute; top:2px; right:6px; background:none; border:none; color:#fff; opacity:.6; font-size:16px; padding:4px; }
+  #guideChip { display:none; }
+  #placeBtns.collapsed #guideChip { display:block; }
+
   /* Info card — KPF brand styling: white, navy headings, wide-tracked uppercase meta labels */
   #infoCard { position:fixed; left:0; right:0; bottom:0; z-index:12; background:var(--kpf-paper); border-radius:14px 14px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .25s ease; box-shadow:0 -8px 30px rgba(0,0,0,.35); }
   #infoCard.open { transform:translateY(0); }
   #infoCard .close { position:absolute; top:12px; right:16px; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; }
+  #infoCard .infoPhoto { width:100%; height:160px; border-radius:10px; margin-bottom:16px; overflow:hidden; background:#e3ded2; display:flex; align-items:center; justify-content:center; }
+  #infoCard .infoPhoto img { width:100%; height:100%; object-fit:cover; object-position:center; display:block; }
+  #infoCard .infoPhoto .placeholder { color:var(--kpf-meta); font-size:12px; font-weight:600; letter-spacing:.06em; text-transform:uppercase; }
   #infoCard h2 { color:var(--kpf-navy); font-size:24px; font-weight:700; letter-spacing:-.01em; margin-bottom:16px; padding-right:30px; }
   #infoCard .fields { display:grid; grid-template-columns:auto 1fr; gap:10px 18px; font-size:14px; margin:0 0 16px; }
   #infoCard .fields dt { text-transform:uppercase; letter-spacing:.11em; font-size:11px; font-weight:600; color:var(--kpf-meta); align-self:center; }
@@ -67,7 +84,7 @@
 </head>
 <body>
 
-<div id="version">v2.9 · no mirror + landscape</div>
+<div id="version">v3.2 · photo pins</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -124,9 +141,26 @@
   <div id="crosshair"></div>
   <div id="status">Move the phone slowly to start tracking, then aim at a building and tap its Align button…</div>
   <button id="exitBtn">Exit AR</button>
+
+  <div id="alignGuide">
+    <button class="close" id="alignGuideClose">&times;</button>
+    <svg viewBox="0 0 120 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+      <rect x="12" y="120" width="96" height="42" fill="#3a4f74"/>
+      <rect x="28" y="82"  width="64" height="38" fill="#33456a"/>
+      <rect x="44" y="46"  width="32" height="36" fill="#2c3c5f"/>
+      <line x1="60" y1="46" x2="60" y2="14" stroke="#2c3c5f" stroke-width="4"/>
+      <line x1="60" y1="14" x2="60" y2="4"  stroke="#2c3c5f" stroke-width="2"/>
+      <circle cx="60" cy="46" r="7" fill="none" stroke="#ff4d4d" stroke-width="2.5"/>
+      <circle cx="60" cy="46" r="2.2" fill="#ff4d4d"/>
+      <text x="72" y="49" fill="#ff8a8a" font-size="12" font-weight="700" font-family="sans-serif">C</text>
+    </svg>
+    <p>Aim the crosshair at the corner where the stepped roofline meets the base of the spire — then tap Align.</p>
+  </div>
+
   <div id="placeBtns"></div>
   <div id="infoCard">
     <button class="close" id="infoClose">&times;</button>
+    <div class="infoPhoto" id="infoPhoto"></div>
     <h2 id="infoName">—</h2>
     <dl class="fields" id="infoFields"></dl>
     <div class="desc" id="infoDesc"></div>
@@ -168,7 +202,7 @@ function info(i){ return {
 // below, so at the party you only edit OFFICE + these coords, and labels auto-place.
 const OFFICE = { lat: 40.754157, lon: -73.981942 };   // viewing spot (set to the party location)
 const BUILDINGS = [
-  { name:"Building 1", lat:40.752282, lon:-73.982214, info:info(0) },
+  { name:"One Vanderbilt", lat:40.752282, lon:-73.982214, info:info(0), photo:"cover.jpg" },
   { name:"Building 2", lat:40.753454, lon:-73.985334, info:info(1) },
   { name:"Building 3", lat:40.754673, lon:-73.984757, info:info(2) },
 ];
@@ -216,6 +250,7 @@ function alignOn(ref) {
   aligned = true;
   setStatus(`Aligned on ${ref.name}. Pan around — all labels are placed and welded. Tap one for info.`);
   $('#placeBtns').classList.add('collapsed');                             // tuck the align buttons into a Re-align chip
+  hideAlignGuide();
 }
 
 function setStatus(t){ $('#status').textContent = t; }
@@ -223,6 +258,9 @@ function setStatus(t){ $('#status').textContent = t; }
 // ---- Info card ----
 function showInfo(b){
   $('#infoName').textContent = b.name;
+  $('#infoPhoto').innerHTML = b.photo
+    ? `<img src="${b.photo}" alt="${b.name}">`
+    : `<span class="placeholder">No photo yet</span>`;
   $('#infoFields').innerHTML = `<dt>Architect</dt><dd>${b.info.architect}</dd>
     <dt>Completed</dt><dd>${b.info.year}</dd><dt>Height</dt><dd>${b.info.height}</dd>`;
   $('#infoDesc').textContent = b.info.desc;
@@ -286,8 +324,21 @@ const reAlign = document.createElement('button');
 reAlign.id = 'reAlignChip';
 reAlign.textContent = 'Re-align';
 reAlign.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
-reAlign.addEventListener('click', (e)=> { e.stopPropagation(); btnBox.classList.remove('collapsed'); setStatus('Aim at a building you recognize and tap its Align button.'); });
+reAlign.addEventListener('click', (e)=> { e.stopPropagation(); btnBox.classList.remove('collapsed'); setStatus('Aim at a building you recognize and tap its Align button.'); showAlignGuide(); });
 btnBox.appendChild(reAlign);
+
+// Guide chip — reopen the alignment diagram after it's been closed or tucked away post-align.
+const guideChip = document.createElement('button');
+guideChip.id = 'guideChip';
+guideChip.textContent = 'Guide';
+guideChip.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
+guideChip.addEventListener('click', (e)=> { e.stopPropagation(); showAlignGuide(); });
+btnBox.appendChild(guideChip);
+
+function showAlignGuide(){ $('#alignGuide').style.display = 'block'; }
+function hideAlignGuide(){ $('#alignGuide').style.display = 'none'; }
+$('#alignGuideClose').addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
+$('#alignGuideClose').addEventListener('click', (e)=> { e.stopPropagation(); hideAlignGuide(); });
 
 // ---- WebXR setup ----
 // ---- Device detection ----
@@ -433,9 +484,11 @@ function render() {
     const onList = [];
     for (const b of BUILDINGS) {
       if (!b.dir) continue;
-      // Lazily create the DOM label + edge arrow for this building.
+      // Lazily create the DOM pin + edge arrow for this building.
       if (!b.labelEl) {
-        b.labelEl = document.createElement('div'); b.labelEl.className = 'arlabel'; b.labelEl.textContent = b.name;
+        b.labelEl = document.createElement('div'); b.labelEl.className = 'arlabel';
+        const photoInner = b.photo ? `<img class="pinPhoto" src="${b.photo}" alt="${b.name}">` : `<div class="pinPhoto placeholder">📍</div>`;
+        b.labelEl.innerHTML = `<div class="pinHead">${photoInner}</div><div class="pinTail"></div><div class="pinName">${b.name}</div>`;
         b.labelEl.addEventListener('pointerdown', () => { ignoreSelectUntil = performance.now() + 500; });
         b.labelEl.addEventListener('click', (e) => { e.stopPropagation(); showInfo(b); });
         $('#overlay').appendChild(b.labelEl);
@@ -485,7 +538,7 @@ function render() {
       el.style.top = it.y + 'px';
       el.style.opacity = it.op.toFixed(3);
       const s = 0.92 + 0.08 * it.b.appear;             // subtle scale-in with the fade
-      el.style.transform = `translate(-50%,-50%) scale(${s.toFixed(3)})`;
+      el.style.transform = `translate(-50%,-100%) scale(${s.toFixed(3)})`;   // pin tip anchors the point, not its center
     }
   }
   renderer.render(scene, camera);
