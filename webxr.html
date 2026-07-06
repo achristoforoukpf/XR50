@@ -135,7 +135,7 @@
 </head>
 <body>
 
-<div id="version">v4.2 · all-14 completion celebration</div>
+<div id="version">v4.3 · fix pin edge-jitter, guided steps</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -199,7 +199,7 @@
 <div id="overlay">
   <div id="crosshair"></div>
   <div id="progressBadge"></div>
-  <div id="status">Move the phone slowly to start tracking, then aim at a building and tap its Align button…</div>
+  <div id="status">Step 1 — move the phone slowly to start tracking, then point at the Empire State Building and tap Align.</div>
   <button id="exitBtn">Exit AR</button>
 
   <div id="alignGuide">
@@ -212,9 +212,10 @@
       <line x1="60" y1="14" x2="60" y2="4"  stroke="#2c3c5f" stroke-width="2"/>
       <circle cx="60" cy="46" r="7" fill="none" stroke="#ff4d4d" stroke-width="2.5"/>
       <circle cx="60" cy="46" r="2.2" fill="#ff4d4d"/>
-      <text x="72" y="49" fill="#ff8a8a" font-size="12" font-weight="700" font-family="sans-serif">C</text>
+      <text x="70" y="43" fill="#ff8a8a" font-size="9" font-weight="700" font-family="sans-serif">Point</text>
+      <text x="70" y="53" fill="#ff8a8a" font-size="9" font-weight="700" font-family="sans-serif">Here</text>
     </svg>
-    <p id="alignGuideText"><b>Empire State Building</b> — aim the crosshair at the corner where the stepped roofline meets the base of the spire, then tap Align.</p>
+    <p id="alignGuideText"><b>Step 1 — Point here</b> on the Empire State Building (where the stepped roofline meets the base of the spire), then tap Align.</p>
   </div>
 
   <div id="placeBtns"></div>
@@ -405,12 +406,17 @@ function alignOn(ref) {
     b.sx = undefined; b.sy = undefined;   // snap cleanly into the new alignment instead of gliding from the old one
   }
   aligned = true;
-  setStatus(`Aligned on ${ref.name}. Pan around — tap any pin for info.`, 3000);   // brief confirmation, then get out of the way
+  setStatus(`Aligned on ${ref.name}! 🎯`, 2200);   // brief confirmation, then hand off to the Step 2 prompt below
+  clearTimeout(stepTwoTimer);
+  stepTwoTimer = setTimeout(() => {
+    setStatus('Step 2 — scan the skyline. Can you find all 14 KPF projects?', 7000);
+  }, 2600);
   $('#placeBtns').classList.add('collapsed');                             // tuck the align buttons into a Re-align chip
   hideAlignGuide();
 }
 
 let statusHideTimer = null;
+let stepTwoTimer = null;
 function setStatus(t, autoHideMs){
   const el = $('#status');
   el.textContent = t;
@@ -512,7 +518,13 @@ function rebuildAlignButtons(){
   reAlign.id = 'reAlignChip';
   reAlign.textContent = 'Re-align';
   reAlign.addEventListener('pointerdown', ()=> { ignoreSelectUntil = performance.now() + 500; });
-  reAlign.addEventListener('click', (e)=> { e.stopPropagation(); btnBox.classList.remove('collapsed'); setStatus('Aim at a building you recognize and tap its Align button.'); showAlignGuide(); });
+  reAlign.addEventListener('click', (e)=> {
+    e.stopPropagation();
+    clearTimeout(stepTwoTimer);
+    btnBox.classList.remove('collapsed');
+    setStatus('Step 1 — point at the Empire State Building and tap Align.');
+    showAlignGuide();
+  });
   btnBox.appendChild(reAlign);
 
   // Guide chip — reopen the alignment diagram after it's been closed or tucked away post-align.
@@ -740,16 +752,22 @@ function render() {
       b._focus = focus;   // read back below when setting the pin's glow — whichever pin you're aiming at lights up
 
       const ndcX = fwd > 0 ? (right/fwd)/tanH : 99, ndcY = fwd > 0 ? (up/fwd)/tanV : 99;
-      const onScreen = fwd > 0 && Math.abs(ndcX) <= 1 && Math.abs(ndcY) <= 1;
+      // Hysteresis: once a pin is on-screen, let it stay on-screen slightly past the edge before
+      // flipping off, and vice versa. Without this, minor tracking noise right at the boundary
+      // flickers a building on/off-screen every other frame — and since the off-screen branch
+      // doesn't update the smoothed position, each flicker let it go stale and then jump to catch
+      // up the moment it flickered back on, which is what read as the pin "dancing" at the edge.
+      const EDGE_MARGIN = 0.1;
+      const edgeThresh = b.onScreen ? 1 + EDGE_MARGIN : 1 - EDGE_MARGIN;
+      const onScreen = fwd > 0 && Math.abs(ndcX) <= edgeThresh && Math.abs(ndcY) <= edgeThresh;
       b.onScreen = onScreen;   // onSelect() only matches buildings that actually have a visible pin
 
-      if (onScreen) {
-        // Smooth toward the freshly computed position instead of snapping to it — device tracking
-        // (ARKit/ARCore) occasionally hiccups for a frame or two, and without smoothing that noise
-        // shows up as the pin instantly teleporting across the screen. A plain exponential ease
-        // still lets one huge single-frame glitch move the pin most of the way there instantly
-        // (22% of a 1000px jump is still 220px), so also hard-clamp how far it can move in one
-        // frame — normal panning is well under this, but a tracking glitch can't teleport it.
+      // Keep the smoothed position tracking continuously whenever the building is in front of the
+      // camera — not only while on-screen — so it never goes stale during a brief flicker near the
+      // edge. Smoothing toward the target instead of snapping to it, plus a hard per-frame pixel
+      // cap (MAX_STEP_PX) on top of the exponential ease, absorbs ARKit/ARCore tracking hiccups
+      // that would otherwise show up as instant teleports.
+      if (fwd > 0.05) {
         const tx = cx + ndcX * cx, ty = cy - ndcY * cy;
         if (b.sx === undefined) { b.sx = tx; b.sy = ty; }
         else {
@@ -757,6 +775,9 @@ function render() {
           const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
           if (dist > 0.01) { b.sx += (dx / dist) * step; b.sy += (dy / dist) * step; }
         }
+      }
+
+      if (onScreen) {
         onList.push({ b, x: b.sx, y: b.sy, op });
       } else {
         b.labelEl.style.opacity = '0';
