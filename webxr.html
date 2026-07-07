@@ -194,7 +194,7 @@
 </head>
 <body>
 
-<div id="version">v5.23 · cluster fan-out, map pan/dot fixes</div>
+<div id="version">v5.24 · rotation-based re-align nudge</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -484,11 +484,18 @@ const camUp = new THREE.Vector3();
 let ignoreSelectUntil = 0;
 let aligned = false;
 let alignedAt = 0;
+let alignYaw = 0;   // camera yaw at the moment of alignment, for the rotation-based drift nudge below
 let driftNudgeShown = false;
 const DRIFT_NUDGE_MS = 4 * 60 * 1000;   // ARKit/ARCore visual-inertial tracking can drift over a long
                                          // session, especially panning across low-texture sky/haze —
                                          // gently suggest Re-align after a few minutes rather than
                                          // leaving people to notice pins are off on their own.
+const DRIFT_NUDGE_TURN_RAD = 100 * Math.PI / 180;   // ...and drift also compounds with how far you've
+                                         // rotated away from wherever you last calibrated — Edge's
+                                         // reflective glass in particular can confuse ARKit's visual
+                                         // tracking, so a big pan (e.g. turning to the opposite side
+                                         // from the ESB alignment) is worth a nudge well before the
+                                         // time-based one would otherwise fire.
 let dirSign = 1;                   // flip if left/right ends up mirrored on this device
 
 // Build a session-space direction from a yaw (rad, clockwise from the align forward) + elevation.
@@ -512,6 +519,7 @@ const MIN_PIN_SCALE = 0.62;
 function alignOn(ref) {
   if (camForward.lengthSq() === 0) { setStatus('Tracking not ready — move the phone a moment.'); return; }
   const refYaw = Math.atan2(camForward.x, -camForward.z);   // session yaw the user is aiming at
+  alignYaw = refYaw;
 
   for (const b of BUILDINGS) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
@@ -1089,7 +1097,10 @@ function render() {
   camForward.set(-m[8], -m[9], -m[10]).normalize();
 
   if (aligned) {
-    if (!driftNudgeShown && performance.now() - alignedAt > DRIFT_NUDGE_MS) {
+    const curYaw = Math.atan2(camForward.x, -camForward.z);
+    let turnRad = Math.abs(curYaw - alignYaw) % (2 * Math.PI);
+    if (turnRad > Math.PI) turnRad = 2 * Math.PI - turnRad;   // shortest angular distance, wrap-aware
+    if (!driftNudgeShown && (performance.now() - alignedAt > DRIFT_NUDGE_MS || turnRad > DRIFT_NUDGE_TURN_RAD)) {
       driftNudgeShown = true;
       setStatus('Pins can drift on a long session — tap Re-align if a tower looks off.', 8000);
     }
