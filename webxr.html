@@ -176,7 +176,7 @@
 </head>
 <body>
 
-<div id="version">v5.19 · smooth pin re-stacking, fix broken-photo pins</div>
+<div id="version">v5.20 · real per-building pin elevation</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -349,36 +349,48 @@ const ANCHOR = { lat: 40.75393935378195, lon: -74.00076274465533 };
 function edgeInfo(desc, year, client){ return { year: year || "TBD", client: client || "—", desc: desc || "Description pending." }; }
 const BUILDINGS = [
   { name:"Empire State Building", lat:40.748817, lon:-73.985428, anchorOnly:true },
-  { name:"One Vanderbilt", lat:40.7528, lon:-73.9792, photo:"photos/one-vanderbilt.jpg", pos:"38% 32%", kpfUrl:"https://www.kpf.com/project/one-vanderbilt",
+  { name:"One Vanderbilt", lat:40.7528, lon:-73.9792, photo:"photos/one-vanderbilt.jpg", pos:"38% 32%", kpfUrl:"https://www.kpf.com/project/one-vanderbilt", hM:427,
     info:edgeInfo("The tallest office tower in Midtown, One Vanderbilt connects directly to the city's transportation network, blending private enterprise and the public realm.", "2020", "SL Green Realty Corp., Hines") },
-  { name:"5 Times Square", lat:40.7557, lon:-73.9874, photo:"photos/5-times-square.jpg", kpfUrl:"https://www.kpf.com/project/5-times-square",
+  { name:"5 Times Square", lat:40.7557, lon:-73.9874, photo:"photos/5-times-square.jpg", kpfUrl:"https://www.kpf.com/project/5-times-square", hM:175,
     info:edgeInfo("Located above one of New York's main subway hubs, 5 Times Square marks its location with an asymmetrical form to match the intersecting street patterns of the theater district.", "2002", "Boston Properties") },
-  { name:"520 Fifth Avenue", lat:40.7544, lon:-73.9805, photo:"photos/520-fifth-avenue.jpg", pos:"66% 45%", kpfUrl:"https://www.kpf.com/project/520-fifth-avenue",
+  { name:"520 Fifth Avenue", lat:40.7544, lon:-73.9805, photo:"photos/520-fifth-avenue.jpg", pos:"66% 45%", kpfUrl:"https://www.kpf.com/project/520-fifth-avenue", hM:305,
     info:edgeInfo("Located on Manhattan's most prestigious business and retail thoroughfare and designed with principles of sustainability, health, wellness, and connectivity, 520 Fifth Avenue is an 88-story vertical village that represents a new concept in luxury residential and boutique office space.", "2025", "Rabina Properties, LLC") },
-  { name:"2 Waterline Square", lat:40.7734, lon:-73.9912, photo:"photos/2-waterline-square.jpg", kpfUrl:"https://www.kpf.com/project/2-waterline-square",
+  { name:"2 Waterline Square", lat:40.7734, lon:-73.9912, photo:"photos/2-waterline-square.jpg", kpfUrl:"https://www.kpf.com/project/2-waterline-square", hM:138,
     info:edgeInfo("Through creative planning and massing adjustments within the strict confines of a previously approved scheme, KPF achieved the client's brief, weaving together 645 mixed-income units with plentiful outdoor space and amenities.", "2019", "GID Development Group") },
-  { name:"55 Hudson Yards", lat:40.7556, lon:-74.0027, photo:"photos/55-hudson-yards.jpg", kpfUrl:"https://www.kpf.com/project/55-hudson-yards",
+  { name:"55 Hudson Yards", lat:40.7556, lon:-74.0027, photo:"photos/55-hudson-yards.jpg", kpfUrl:"https://www.kpf.com/project/55-hudson-yards", hM:238,
     info:edgeInfo("55 Hudson Yards synthesizes the contemporary, sleek forms of Manhattan's new mega-development with the industrial roots of its neighboring Meatpacking District.", "2019", "The Related Companies") },
-  { name:"10 Hudson Yards", lat:40.7541, lon:-74.0019, photo:"photos/10-hudson-yards.jpg", kpfUrl:"https://www.kpf.com/project/10-30-hudson-yards",   // CSV note: double check these coordinates
+  { name:"10 Hudson Yards", lat:40.7541, lon:-74.0019, photo:"photos/10-hudson-yards.jpg", kpfUrl:"https://www.kpf.com/project/10-30-hudson-yards", hM:268,   // CSV note: double check these coordinates
     info:edgeInfo("", "2017", "The Related Companies") },
-  { name:"20 Hudson Yards", lat:40.7534, lon:-74.0027, photo:"photos/20-hudson-yards.jpg", pos:"32% 55%", kpfUrl:"https://www.kpf.com/project/20-hudson-yards",
+  { name:"20 Hudson Yards", lat:40.7534, lon:-74.0027, photo:"photos/20-hudson-yards.jpg", pos:"32% 55%", kpfUrl:"https://www.kpf.com/project/20-hudson-yards", hM:69,
     info:edgeInfo("Situated between 10 and 30 Hudson Yards, 20 Hudson Yards is home to Wells Fargo and The Shops and Restaurants at Hudson Yards, one of New York City's premiere locations for fashion and dining, elevating the standard for shopping in a dynamic, mixed-used setting.", "2019", "The Related Companies") },
-  { name:"One Madison Avenue", lat:40.7412, lon:-73.9869, photo:"photos/one-madison-avenue.jpg", pos:"88% 48%", kpfUrl:"https://www.kpf.com/project/one-madison-avenue",
+  { name:"One Madison Avenue", lat:40.7412, lon:-73.9869, photo:"photos/one-madison-avenue.jpg", pos:"88% 48%", kpfUrl:"https://www.kpf.com/project/one-madison-avenue", hM:143,
     info:edgeInfo("With a design complementing its landmarked neighbor, the transformation of One Madison Avenue brings flexible, Class-A office space to Manhattan's Flatiron District.", "2024", "SL Green Realty Corp., Hines") },
-  { name:"Madison Square Park Tower", lat:40.7398, lon:-73.9874, photo:"photos/madison-square-park-tower.jpg", pos:"60% 42%", kpfUrl:"https://www.kpf.com/project/45-east-22nd-street",
+  { name:"Madison Square Park Tower", lat:40.7398, lon:-73.9874, photo:"photos/madison-square-park-tower.jpg", pos:"60% 42%", kpfUrl:"https://www.kpf.com/project/45-east-22nd-street", hM:237,
     info:edgeInfo("Tapering skyward from Manhattan's Flatiron district, the Madison Square Park Tower's crystalline form creates varied floorplates, ample room for customization of unit layouts, and an unparalleled residential experience.", "2018", "The Continuum Company") },
-  { name:"500 West 21st Street", lat:40.7464, lon:-74.0051, photo:"photos/500-west-21st-street.jpg", kpfUrl:"https://www.kpf.com/project/500-west-21st-street",
+  { name:"500 West 21st Street", lat:40.7464, lon:-74.0051, photo:"photos/500-west-21st-street.jpg", kpfUrl:"https://www.kpf.com/project/500-west-21st-street", hM:25,
     info:edgeInfo("Situated along New York City's celebrated High Line, 500 West 21st Street is a luxury 8-story residential building that respects its context with both its scale and the refined character of its façades.", "2015", "Sherwood Equities") },
-  { name:"Brooklyn Point", lat:40.6912, lon:-73.9825, photo:"photos/brooklyn-point.jpg", pos:"38% 72%", kpfUrl:"https://www.kpf.com/project/brooklyn-point",
+  { name:"Brooklyn Point", lat:40.6912, lon:-73.9825, photo:"photos/brooklyn-point.jpg", pos:"38% 72%", kpfUrl:"https://www.kpf.com/project/brooklyn-point", hM:219,
     info:edgeInfo("With its sculptural façade and eclectic materiality, Brooklyn Point sets a new standard for luxury living in Downtown Brooklyn while suiting the borough's renowned creative spirit.", "2021", "FAD Holdings LLC") },
-  { name:"111 Murray Street", lat:40.7154, lon:-74.0129, photo:"photos/111-murray-street.jpg", pos:"42% 40%", kpfUrl:"https://www.kpf.com/project/111-murray-street",
+  { name:"111 Murray Street", lat:40.7154, lon:-74.0129, photo:"photos/111-murray-street.jpg", pos:"42% 40%", kpfUrl:"https://www.kpf.com/project/111-murray-street", hM:244,
     info:edgeInfo("An elegant addition to downtown Manhattan, 111 Murray will set a new standard for luxury residential buildings, both inside and out, while contrasting its surroundings in height and disposition.", "2019", "Fisher Brothers; Witkoff Group") },
-  { name:"388 Greenwich Street", lat:40.7206, lon:-74.0106, photo:"photos/388-greenwich-street.jpg",   // CSV note: needs a short description; no live KPF.com page found
+  { name:"388 Greenwich Street", lat:40.7206, lon:-74.0106, photo:"photos/388-greenwich-street.jpg", hM:172,   // CSV note: needs a short description; no live KPF.com page found
     info:edgeInfo("", "1989", "American Express; Shearson Lehman Brothers") },
-  { name:"Hudson Commons", lat:40.7539, lon:-73.9965, photo:"photos/hudson-commons.jpg", kpfUrl:"https://www.kpf.com/project/hudson-commons",
+  { name:"Hudson Commons", lat:40.7539, lon:-73.9965, photo:"photos/hudson-commons.jpg", kpfUrl:"https://www.kpf.com/project/hudson-commons", hM:142,
     info:edgeInfo("Situated at the gateway to the Hudson Yards submarket, this repositioned, LEED Platinum office tower maintains the expression of the site and neighborhood while attracting creative tenants to its new Class-A workspace.", "2019", "COVE Property Group LLC") },
 ];
-BUILDINGS.forEach(b => { const bd=bearingDistance(ANCHOR.lat,ANCHOR.lon,b.lat,b.lon); b.bearing=bd.bearing; b.dist=bd.dist; });
+// Edge's observation deck sits ~345m above sea level (1,131ft deck height + ~10m street elevation);
+// most of these projects are far shorter than that, so from here you're actually looking DOWN at
+// almost all of them — only One Vanderbilt (427m) pokes up near/above eye level. A single fixed
+// upward elevation for every pin (the old behavior) put short/close buildings floating in the sky
+// disconnected from where they actually are, and flattened out the one building that should read as
+// distinctly higher. Ground elevation varies a bit across sites, but a flat citywide approximation
+// here is still far closer to reality than ignoring height/distance entirely.
+const VIEWER_ELEV_M = 345, GROUND_ELEV_M = 10;
+BUILDINGS.forEach(b => {
+  const bd = bearingDistance(ANCHOR.lat, ANCHOR.lon, b.lat, b.lon);
+  b.bearing = bd.bearing; b.dist = bd.dist;
+  b.elevRad = b.hM ? Math.atan2((GROUND_ELEV_M + b.hM) - VIEWER_ELEV_M, b.dist) : 0;
+});
 
 // ---- Discovery tracking ("gamification"): remember which buildings have had their card opened ----
 const DISCOVERED_KEY = 'xr50_discovered';
@@ -468,8 +480,9 @@ function dirFromYaw(yaw, elevRad) {
 }
 
 // Align on one recognizable building: aim the crosshair at it, tap its button. Its real bearing
-// becomes the anchor; every other label is placed at its own bearing offset from that.
-const PIN_ELEV = 5 * Math.PI / 180;   // pins hover at a fixed elevation above the skyline, not at each building's real bearing height
+// becomes the anchor; every other label is placed at its own bearing offset from that, and now at
+// its own real elevation angle too (b.elevRad, computed above from height/distance) instead of a
+// single fixed elevation for every pin.
 const POS_SMOOTH = 0.13;   // 0-1, how much of the remaining distance to close each frame — lower = smoother but laggier
 const MAX_STEP_PX = 22;    // hard cap on pixels a pin can move in a single frame, regardless of how big the raw jump is
 const DIST_SCALE_NEAR = 400, DIST_SCALE_FAR = 3800;   // meters — pins at/under NEAR render full size, at/over FAR render at MIN_PIN_SCALE
@@ -481,7 +494,7 @@ function alignOn(ref) {
 
   for (const b of BUILDINGS) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
-    b.dir = dirFromYaw(refYaw + dTheta, b.anchorOnly ? 0 : PIN_ELEV).normalize();   // fixed DIRECTION (behaves like infinity)
+    b.dir = dirFromYaw(refYaw + dTheta, b.anchorOnly ? 0 : b.elevRad).normalize();   // fixed DIRECTION (behaves like infinity)
     b.sx = undefined; b.sy = undefined;   // snap cleanly into the new alignment instead of gliding from the old one
     b.dispX = undefined; b.dispY = undefined;   // same for the collision-stacked display position below
   }
