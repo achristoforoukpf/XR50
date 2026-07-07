@@ -144,22 +144,6 @@
   #celebrateBanner { display:none; margin-top:14px; padding:10px 14px; border-radius:10px; background:#eafaf0; color:#1a7a45; font-weight:700; font-size:14px; }
   #celebrateBanner.show { display:block; animation:celebrateIn .4s ease-out; }
 
-  /* Cluster picker — tapping a merged cluster badge opens this instead of an info card directly,
-     since it represents several buildings at once and we don't know which one you meant. */
-  #clusterScrim { position:fixed; inset:0; z-index:11; background:rgba(4,10,24,0); pointer-events:none; transition:background .35s var(--ease-out); }
-  #clusterScrim.open { background:rgba(4,10,24,0.4); pointer-events:auto; }
-  #clusterSheet { position:fixed; left:0; right:0; bottom:0; z-index:12; background:var(--kpf-paper); border-radius:14px 14px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .45s var(--ease-spring); box-shadow:0 -8px 30px rgba(0,0,0,.35); max-height:70vh; overflow-y:auto; }
-  #clusterSheet.open { transform:translateY(0); }
-  #clusterSheet .close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; z-index:1; }
-  #clusterSheet h2 { color:var(--kpf-navy); font-size:20px; font-weight:800; margin-bottom:4px; padding-right:30px; }
-  #clusterSheet .clusterSub { color:var(--kpf-body); font-size:12.5px; line-height:1.4; margin-bottom:14px; }
-  .clusterRow { width:100%; display:flex; align-items:center; gap:12px; padding:10px 4px; background:none; border:none; border-top:1px solid var(--kpf-rule); text-align:left; }
-  .clusterRow:first-child { border-top:none; }
-  .clusterRow .crThumb { flex:0 0 auto; width:48px; height:48px; border-radius:50%; overflow:hidden; background:#e3ded2; display:flex; align-items:center; justify-content:center; }
-  .clusterRow .crThumb img { width:100%; height:100%; object-fit:cover; display:block; }
-  .clusterRow .crName { flex:1; font-size:15px; font-weight:600; color:var(--kpf-navy); }
-  .clusterRow .crCheck { flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:#2ecc71; color:#fff; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; }
-
   /* Big one-time celebration for finding all 14 — a step above the per-pin discovery flourish. */
   #completeOverlay { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; background:rgba(4,10,24,0.72); }
   #completeOverlay.show { display:flex; }
@@ -183,13 +167,20 @@
   #mapCard .close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; }
   #mapCard h2 { color:var(--kpf-navy); font-size:20px; font-weight:800; margin-bottom:4px; padding-right:30px; }
   #mapCard .mapSub { color:var(--kpf-body); font-size:12.5px; line-height:1.4; margin-bottom:16px; }
-  #mapRadar { position:relative; width:100%; aspect-ratio:640/880; border-radius:12px; overflow:hidden; background:#0A1E42 center/cover no-repeat; margin:0 auto 8px; border:1px solid rgba(255,255,255,.15); touch-action:none; }
+  #mapRadar { position:relative; width:100%; aspect-ratio:640/880; border-radius:12px; overflow:hidden; background:#0A1E42 center/cover no-repeat; margin:0 auto 8px; border:1px solid rgba(255,255,255,.15); touch-action:none; user-select:none; -webkit-user-select:none; }
   /* Pinch-zoom/pan is applied as one transform on this layer (image + dots move/scale together as a
      unit) rather than recomputing every dot's percentage position — simpler and can't drift out of
      sync with the image underneath it. */
   #mapZoomLayer { position:absolute; inset:0; transform-origin:center center; will-change:transform; }
-  #mapZoomLayer img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+  /* -webkit-user-drag/-touch-callout: a single-finger drag on a plain <img> can start a native
+     "drag the image" gesture (or, on iOS, a press-and-hold callout) that swallows the touch before
+     our own pointermove handler ever sees it — pinch-zoom (two fingers) isn't a native drag gesture
+     so it worked fine already, but a one-finger pan silently didn't without these. */
+  #mapZoomLayer img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; -webkit-user-drag:none; user-drag:none; -webkit-touch-callout:none; pointer-events:none; }
   #mapViewerDot { position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px; border-radius:50%; background:#4da3ff; border:2px solid #fff; box-shadow:0 0 0 5px rgba(77,163,255,.35), 0 2px 6px rgba(0,0,0,.4); z-index:2; }
+  /* Dots counter-scale against the zoom layer's transform (applied inline via JS) so they read as a
+     constant size on screen regardless of zoom, the way a real map's pins would, instead of ballooning
+     as you zoom in. */
   .mapDot { position:absolute; width:14px; height:14px; margin:-7px; border-radius:50%; background:rgba(255,255,255,.55); border:2px solid rgba(10,30,66,.7); box-shadow:0 1px 4px rgba(0,0,0,.35); transition:background .3s var(--ease-out), border-color .3s var(--ease-out); z-index:1; }
   .mapDot.found { background:#2ecc71; border-color:#fff; }
   .mapDot.anchor { width:11px; height:11px; margin:-5.5px; background:#ff4d4d; border-color:#fff; }
@@ -203,7 +194,7 @@
 </head>
 <body>
 
-<div id="version">v5.22 · pinch-zoom &amp; pan on map</div>
+<div id="version">v5.23 · cluster fan-out, map pan/dot fixes</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -309,14 +300,6 @@
     <a id="infoLink" href="#" target="_blank" rel="noopener noreferrer">View on KPF.com →</a>
     <div id="celebrateBanner"></div>
     <div class="tag" style="display:none;">FULL WRITE-UP COMING SOON</div>
-  </div>
-
-  <div id="clusterScrim"></div>
-  <div id="clusterSheet">
-    <button class="close" id="clusterClose">&times;</button>
-    <h2>Which one?</h2>
-    <p class="clusterSub">These pins are close together from here — pick one.</p>
-    <div id="clusterList"></div>
   </div>
 
   <div id="completeOverlay">
@@ -536,6 +519,12 @@ function alignOn(ref) {
     b.sx = undefined; b.sy = undefined;   // snap cleanly into the new alignment instead of gliding from the old one
     b.dispX = undefined; b.dispY = undefined;   // same for the collision-stacked display position below
   }
+  // Cluster badges have their own smoothed display position (clusterDisp), keyed by membership —
+  // without clearing it here, a badge whose members re-align to a very different screen position
+  // would slowly crawl there at the usual per-frame pixel cap instead of snapping like every
+  // individual pin above, which is exactly what looked like a cluster "stuck" in the wrong spot.
+  for (const key of Object.keys(clusterDisp)) delete clusterDisp[key];
+  expandedClusters.clear();
   aligned = true;
   alignedAt = performance.now();
   driftNudgeShown = false;
@@ -562,31 +551,9 @@ function setStatus(t, autoHideMs){
 function openInfoCard(){ $('#infoCard').classList.add('open'); $('#infoScrim').classList.add('open'); }
 function closeInfoCard(){ $('#infoCard').classList.remove('open'); $('#infoScrim').classList.remove('open'); }
 
-// ---- Cluster picker: several pins too close together on screen merge into one badge (see render()
-// below); tapping it opens this instead of jumping straight to an info card, since we don't know
-// which building was meant. ----
-function openClusterPicker(members){
-  $('#clusterList').innerHTML = members.map((b, i) => `
-    <button class="clusterRow" data-i="${i}">
-      <span class="crThumb">${b.photo ? `<img src="${b.photo}" alt="${b.name}">` : '📍'}</span>
-      <span class="crName">${b.name}</span>
-      ${isDiscovered(b) ? '<span class="crCheck">✓</span>' : ''}
-    </button>
-  `).join('');
-  $$('#clusterList .clusterRow').forEach((row, i) => {
-    row.addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
-    row.addEventListener('click', () => { closeClusterPicker(); showInfo(members[i]); });
-  });
-  $('#clusterSheet').classList.add('open');
-  $('#clusterScrim').classList.add('open');
-}
-function closeClusterPicker(){ $('#clusterSheet').classList.remove('open'); $('#clusterScrim').classList.remove('open'); }
-$('#clusterClose').addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
-$('#clusterClose').addEventListener('click', closeClusterPicker);
-$('#clusterScrim').addEventListener('pointerdown', () => { ignoreSelectUntil = performance.now() + 500; });
-$('#clusterScrim').addEventListener('click', closeClusterPicker);
 
 function showInfo(b){
+  expandedClusters.clear();   // picked one — collapse any broken-out cluster back to a badge
   $('#infoName').textContent = b.name;
   $('#infoPhoto').innerHTML = b.photo
     ? `<img src="${b.photo}" alt="${b.name}">`
@@ -708,7 +675,16 @@ function clampMapPan() {
   mapPanX = clamp(mapPanX, -maxX, maxX);
   mapPanY = clamp(mapPanY, -maxY, maxY);
 }
-function applyMapTransform() { $('#mapZoomLayer').style.transform = `translate(${mapPanX}px, ${mapPanY}px) scale(${mapScale})`; }
+function applyMapTransform() {
+  $('#mapZoomLayer').style.transform = `translate(${mapPanX}px, ${mapPanY}px) scale(${mapScale})`;
+  // Dots are children of the zoomed layer (so their percentage-based left/top stays correct as it
+  // pans), but that means they'd otherwise balloon in visual size along with the image as you zoom
+  // in — counter-scale each one so they read as a constant size, like pins on a real map app.
+  const inv = 1 / mapScale;
+  const viewerDot = $('#mapViewerDot');
+  if (viewerDot) viewerDot.style.transform = `scale(${inv})`;
+  for (const b of BUILDINGS) { if (b.mapDotEl) b.mapDotEl.style.transform = `scale(${inv})`; }
+}
 function resetMapZoom() { mapScale = 1; mapPanX = 0; mapPanY = 0; applyMapTransform(); }
 $('#mapRadar').addEventListener('pointerdown', (e) => {
   mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
@@ -1085,12 +1061,17 @@ function pinInnerHTML(photo, pos, name, checkContent){
 // lose the CSS opacity/transform transitions and any position smoothing.
 const clusterPool = {};
 const clusterDisp = {};
+// Tapping a cluster badge "breaks it out" into its individual member pins (fanned out so they don't
+// still overlap) rather than opening a separate list — key -> the timestamp it should re-collapse at,
+// so it recovers on its own if you wander off without picking one instead of staying expanded forever.
+const expandedClusters = new Map();
+const EXPAND_MS = 8000;
 function getClusterEl(key) {
   if (!clusterPool[key]) {
     const el = document.createElement('div');
     el.className = 'arlabel cluster';
     el.addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
-    el.addEventListener('click', (e) => { e.stopPropagation(); if (el._members) openClusterPicker(el._members); });
+    el.addEventListener('click', (e) => { e.stopPropagation(); if (el._key) expandedClusters.set(el._key, performance.now() + EXPAND_MS); });
     $('#overlay').appendChild(el);
     clusterPool[key] = el;
   }
@@ -1224,65 +1205,82 @@ function render() {
       if (!usedArrowKeys.has(key)) arrowPool[key].style.display = 'none';
     }
 
+    // Renders one building's pin at a given target position, easing b.dispX/dispY toward it exactly
+    // like the base tracked position eases toward its own raw target — shared by genuine singles and
+    // by expanded cluster members (whose "target" is a synthetic fanned-out slot, not their real
+    // overlapping position), so both glide into place the same way instead of snapping.
+    function renderPinAt(it, tx, ty) {
+      const b = it.b;
+      const el = b.labelEl;
+      if (b.dispX === undefined) { b.dispX = tx; b.dispY = ty; }
+      else {
+        const dx = tx - b.dispX, dy = ty - b.dispY, dist = Math.hypot(dx, dy);
+        const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
+        if (dist > 0.01) { b.dispX += (dx / dist) * step; b.dispY += (dy / dist) * step; }
+      }
+      el.style.display = 'block';
+      el.style.left = b.dispX + 'px';
+      el.style.top = b.dispY + 'px';
+      const seenFade = el.classList.contains('discovered') ? 0.55 : 1;   // slight fade once you've opened its card
+      el.style.opacity = (it.op * seenFade).toFixed(3);
+      // Closer buildings render a bit bigger than farther ones — a subtle depth hierarchy instead
+      // of every pin reading as the same size regardless of how far away the actual tower is.
+      const distScale = clamp(1 - (b.dist - DIST_SCALE_NEAR) / (DIST_SCALE_FAR - DIST_SCALE_NEAR), 0, 1) * (1 - MIN_PIN_SCALE) + MIN_PIN_SCALE;
+      const focus = b._focus || 0;
+      const finalScale = distScale * (1 + focus * 0.1);   // whichever pin you're aiming at grows slightly
+      el.style.transform = `translate(-50%,-100%) scale(${finalScale.toFixed(3)})`;   // pin tip anchors the point, not its center; CSS eases the pop-in from the 0.85 default
+      if (b.pinHeadEl) {
+        b.pinHeadEl.style.boxShadow = focus > 0.08
+          ? `0 0 ${(10 + 26 * focus).toFixed(0)}px rgba(255,255,255,${(0.25 + 0.45 * focus).toFixed(2)})`
+          : 'none';
+      }
+    }
+
     const usedClusterKeys = new Set();
+    const FAN_GAP = 66;   // px between fanned-out members — a touch more than one 60px pin head
     for (const group of Object.values(groups)) {
       if (group.length === 1) {
-        const it = group[0];
-        const b = it.b;
-        const el = b.labelEl;
-        // Ease toward the target the same way b.sx/b.sy eases toward the raw tracked position, so
-        // a pin moving in/out of a cluster (which changes its target) glides rather than teleports.
-        if (b.dispX === undefined) { b.dispX = it.x; b.dispY = it.y; }
-        else {
-          const dx = it.x - b.dispX, dy = it.y - b.dispY, dist = Math.hypot(dx, dy);
-          const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
-          if (dist > 0.01) { b.dispX += (dx / dist) * step; b.dispY += (dy / dist) * step; }
-        }
-        el.style.display = 'block';
-        el.style.left = b.dispX + 'px';
-        el.style.top = b.dispY + 'px';
-        const seenFade = el.classList.contains('discovered') ? 0.55 : 1;   // slight fade once you've opened its card
-        el.style.opacity = (it.op * seenFade).toFixed(3);
-        // Closer buildings render a bit bigger than farther ones — a subtle depth hierarchy instead
-        // of every pin reading as the same size regardless of how far away the actual tower is.
-        const distScale = clamp(1 - (b.dist - DIST_SCALE_NEAR) / (DIST_SCALE_FAR - DIST_SCALE_NEAR), 0, 1) * (1 - MIN_PIN_SCALE) + MIN_PIN_SCALE;
-        const focus = b._focus || 0;
-        const finalScale = distScale * (1 + focus * 0.1);   // whichever pin you're aiming at grows slightly
-        el.style.transform = `translate(-50%,-100%) scale(${finalScale.toFixed(3)})`;   // pin tip anchors the point, not its center; CSS eases the pop-in from the 0.85 default
-        if (b.pinHeadEl) {
-          b.pinHeadEl.style.boxShadow = focus > 0.08
-            ? `0 0 ${(10 + 26 * focus).toFixed(0)}px rgba(255,255,255,${(0.25 + 0.45 * focus).toFixed(2)})`
-            : 'none';
-        }
-      } else {
-        // Too many pins to keep individually tappable here — merge into one badge with a count
-        // instead of a cramped overlapping stack; tapping it opens a picker to disambiguate.
-        for (const it of group) it.b.labelEl.style.display = 'none';
-        group.sort((a, b) => a.b.dist - b.b.dist);   // closest first — its photo leads the badge
-        const key = group.map(it => it.b.name).sort().join('|');
-        usedClusterKeys.add(key);
-        const el = getClusterEl(key);
-        el._members = group.map(it => it.b);
-        const lead = group[0].b;
-        if (el.dataset.lead !== lead.name) {
-          el.dataset.lead = lead.name;
-          const label = group.length === 2 ? group.map(it => it.b.name).join(' & ') : `${group.length} buildings here`;
-          el.innerHTML = pinInnerHTML(lead.photo, lead.pos, label, String(group.length));
-        }
+        renderPinAt(group[0], group[0].x, group[0].y);
+        continue;
+      }
+      const key = group.map(it => it.b.name).sort().join('|');
+      const expiry = expandedClusters.get(key);
+      if (expiry && performance.now() < expiry) {
+        // Broken out by an earlier tap — show each member as its own pin, spread in a row around the
+        // cluster's average position instead of a merged badge.
+        group.sort((a, b) => a.b.dist - b.b.dist);
         const avgX = group.reduce((s, it) => s + it.x, 0) / group.length;
         const avgY = group.reduce((s, it) => s + it.y, 0) / group.length;
-        if (!clusterDisp[key]) clusterDisp[key] = { x: avgX, y: avgY };
-        const disp = clusterDisp[key];
-        const dx = avgX - disp.x, dy = avgY - disp.y, dist = Math.hypot(dx, dy);
-        const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
-        if (dist > 0.01) { disp.x += (dx / dist) * step; disp.y += (dy / dist) * step; }
-        const maxOp = Math.max(...group.map(it => it.op));
-        el.style.display = 'block';
-        el.style.left = disp.x + 'px';
-        el.style.top = disp.y + 'px';
-        el.style.opacity = maxOp.toFixed(3);
-        el.style.transform = 'translate(-50%,-100%) scale(1)';
+        group.forEach((it, i) => renderPinAt(it, avgX + (i - (group.length - 1) / 2) * FAN_GAP, avgY));
+        continue;
       }
+      if (expiry) expandedClusters.delete(key);   // expired — fall through to a merged badge again
+      // Too many pins to keep individually tappable here — merge into one badge with a count;
+      // tapping it breaks the cluster out into the individual pins above.
+      for (const it of group) it.b.labelEl.style.display = 'none';
+      group.sort((a, b) => a.b.dist - b.b.dist);   // closest first — its photo leads the badge
+      usedClusterKeys.add(key);
+      const el = getClusterEl(key);
+      el._key = key;
+      const lead = group[0].b;
+      if (el.dataset.lead !== lead.name) {
+        el.dataset.lead = lead.name;
+        const label = group.length === 2 ? group.map(it => it.b.name).join(' & ') : `${group.length} buildings here`;
+        el.innerHTML = pinInnerHTML(lead.photo, lead.pos, label, String(group.length));
+      }
+      const avgX = group.reduce((s, it) => s + it.x, 0) / group.length;
+      const avgY = group.reduce((s, it) => s + it.y, 0) / group.length;
+      if (!clusterDisp[key]) clusterDisp[key] = { x: avgX, y: avgY };
+      const disp = clusterDisp[key];
+      const dx = avgX - disp.x, dy = avgY - disp.y, dist = Math.hypot(dx, dy);
+      const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
+      if (dist > 0.01) { disp.x += (dx / dist) * step; disp.y += (dy / dist) * step; }
+      const maxOp = Math.max(...group.map(it => it.op));
+      el.style.display = 'block';
+      el.style.left = disp.x + 'px';
+      el.style.top = disp.y + 'px';
+      el.style.opacity = maxOp.toFixed(3);
+      el.style.transform = 'translate(-50%,-100%) scale(1)';
     }
     for (const key of Object.keys(clusterPool)) {
       if (!usedClusterKeys.has(key)) clusterPool[key].style.display = 'none';
