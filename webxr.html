@@ -194,7 +194,7 @@
 </head>
 <body>
 
-<div id="version">v5.27 · KPF.com link opens in Safari, not a dead-end</div>
+<div id="version">v5.28 · force KPF.com link to escape into Safari on iOS</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -560,6 +560,13 @@ function openInfoCard(){ $('#infoCard').classList.add('open'); $('#infoScrim').c
 function closeInfoCard(){ $('#infoCard').classList.remove('open'); $('#infoScrim').classList.remove('open'); }
 
 
+// x-safari-https:// is a system-reserved iOS URL scheme — the OS routes it straight to Safari.app
+// the same way it does tel:/mailto:, independent of whatever app/webview is currently hosting the
+// page. Inside Variant Launch's App Clip webview a normal https:// link stays trapped with no way
+// back (no browser chrome at all, by Apple's App Clip design), so this is the standard escape hatch —
+// iOS-only: Android/desktop don't recognize the scheme and would just fail to open it outright.
+function toSafariUrl(url) { return detectDevice().iOS ? url.replace(/^https?:\/\//, (m) => 'x-safari-' + m) : url; }
+
 function showInfo(b){
   expandedClusters.clear();   // picked one — collapse any broken-out cluster back to a badge
   $('#infoName').textContent = b.name;
@@ -572,7 +579,7 @@ function showInfo(b){
   // so a blanket "placeholder demo data" tag on every card was no longer accurate.
   $('#infoCard .tag').style.display = (b.info.desc === 'Description pending.') ? 'inline-block' : 'none';
   const link = $('#infoLink');
-  if (b.kpfUrl) { link.href = b.kpfUrl; link.classList.add('show'); }
+  if (b.kpfUrl) { link.href = toSafariUrl(b.kpfUrl); link.classList.add('show'); }
   else { link.removeAttribute('href'); link.classList.remove('show'); }
   openInfoCard();
   const isNew = markDiscovered(b);
