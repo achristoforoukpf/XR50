@@ -176,7 +176,7 @@
 </head>
 <body>
 
-<div id="version">v5.18 · inline cover photo, load-failure watchdog</div>
+<div id="version">v5.19 · smooth pin re-stacking, fix broken-photo pins</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -483,6 +483,7 @@ function alignOn(ref) {
     const dTheta = ((b.bearing - ref.bearing) * Math.PI/180) * dirSign;   // azimuth offset from ref
     b.dir = dirFromYaw(refYaw + dTheta, b.anchorOnly ? 0 : PIN_ELEV).normalize();   // fixed DIRECTION (behaves like infinity)
     b.sx = undefined; b.sy = undefined;   // snap cleanly into the new alignment instead of gliding from the old one
+    b.dispX = undefined; b.dispY = undefined;   // same for the collision-stacked display position below
   }
   aligned = true;
   alignedAt = performance.now();
@@ -973,6 +974,11 @@ function render() {
         b.labelEl.addEventListener('click', (e) => { e.stopPropagation(); showInfo(b); });
         $('#overlay').appendChild(b.labelEl);
         b.pinHeadEl = b.labelEl.querySelector('.pinHead');   // cached so the focus glow below doesn't query the DOM every frame
+        // If the photo fails to load (e.g. a weak connection at the venue), the browser's default
+        // fallback is to render the alt text crammed inside the 60px circle — swap in the plain
+        // placeholder pin instead of leaving that behind.
+        const img = b.pinHeadEl.querySelector('img.pinPhoto');
+        if (img) img.addEventListener('error', () => { b.pinHeadEl.innerHTML = '<div class="pinPhoto placeholder">📍</div>'; }, { once: true });
       }
       // Opacity: dim far buildings, brighten the one you're aiming toward ("approach" = look at it).
       // No manual fade-in ramp here — the CSS transition on .arlabel eases every opacity/transform
@@ -1059,10 +1065,23 @@ function render() {
     }
 
     for (const it of onList) {
-      const el = it.b.labelEl;
+      const b = it.b;
+      const el = b.labelEl;
+      // The collision pass above can re-sort/re-stack every frame as pins drift by a sub-pixel
+      // amount near its threshold, which used to snap the rendered position straight to the new
+      // stacked slot with no easing — on a cluster of overlapping pins that read as constant
+      // "bouncing" even though the underlying tracked position (b.sx/b.sy) barely moved. Ease
+      // toward the stacked target the same way b.sx/b.sy eases toward the raw tracked position,
+      // so a re-stack glides into place instead of teleporting.
+      if (b.dispX === undefined) { b.dispX = it.x; b.dispY = it.y; }
+      else {
+        const dx = it.x - b.dispX, dy = it.y - b.dispY, dist = Math.hypot(dx, dy);
+        const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
+        if (dist > 0.01) { b.dispX += (dx / dist) * step; b.dispY += (dy / dist) * step; }
+      }
       el.style.display = 'block';
-      el.style.left = it.x + 'px';
-      el.style.top = it.y + 'px';
+      el.style.left = b.dispX + 'px';
+      el.style.top = b.dispY + 'px';
       const seenFade = el.classList.contains('discovered') ? 0.55 : 1;   // slight fade once you've opened its card
       el.style.opacity = (it.op * seenFade).toFixed(3);
       // Closer buildings render a bit bigger than farther ones — a subtle depth hierarchy instead
