@@ -103,7 +103,8 @@
   #placeBtns.collapsed .alignbtn { display:none; }
   #placeBtns.collapsed #reAlignChip { display:block; }
 
-  #exitBtn { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
+  #topRightBar { position:fixed; top:calc(34px + env(safe-area-inset-top)); right:12px; z-index:13; display:flex; gap:8px; }
+  #topRightBar button { background:rgba(0,0,0,.55); border:1px solid rgba(255,255,255,.4); color:#fff; font-size:12px; font-weight:600; padding:8px 12px; border-radius:10px; }
 
   /* Alignment guide — shows where on the anchor building to aim before tapping Align. */
   #alignGuide { position:fixed; left:12px; top:calc(172px + env(safe-area-inset-top)); width:154px; z-index:13; background:rgba(10,30,66,0.88); border:1px solid rgba(255,255,255,.4); border-radius:14px; padding:10px 10px 8px; box-shadow:0 4px 16px rgba(0,0,0,.45); }
@@ -147,11 +148,40 @@
   #confettiLayer { position:absolute; inset:0; overflow:hidden; pointer-events:none; }
   @keyframes confettiFall { 0%{transform:translateY(-10vh) rotate(0deg); opacity:1;} 100%{transform:translateY(110vh) rotate(540deg); opacity:.9;} }
   .confetti { position:absolute; top:0; width:8px; height:14px; opacity:0; animation-name:confettiFall; animation-timing-function:cubic-bezier(0.4,0.1,0.6,0.9); animation-fill-mode:forwards; }
+
+  /* Skyline map — a static top-down compass, not a real map tile (no network dependency). Pins sit
+     at each building's real bearing/distance from the anchor; undiscovered ones stay unlabeled so
+     the AR "find it yourself" reveal isn't spoiled, but the direction hint still syncs with progress. */
+  #mapOverlay { position:fixed; inset:0; z-index:16; display:none; align-items:center; justify-content:center; background:rgba(4,10,24,0.78); }
+  #mapOverlay.show { display:flex; }
+  #mapCard { position:relative; width:min(88vw,340px); max-height:88vh; overflow-y:auto; background:var(--kpf-paper); border-radius:18px; padding:22px 20px calc(20px + env(safe-area-inset-bottom)); box-shadow:0 20px 60px rgba(0,0,0,.5); animation:celebrateIn .4s var(--ease-spring); }
+  #mapCard .close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; }
+  #mapCard h2 { color:var(--kpf-navy); font-size:20px; font-weight:800; margin-bottom:4px; padding-right:30px; }
+  #mapCard .mapSub { color:var(--kpf-body); font-size:12.5px; line-height:1.4; margin-bottom:16px; }
+  #mapRadar { position:relative; width:100%; aspect-ratio:1/1; border-radius:50%; background:radial-gradient(circle,#12325a 0%,#0A1E42 70%,#071228 100%); margin:0 auto 14px; border:1px solid rgba(255,255,255,.15); }
+  .mapRing { position:absolute; border:1px solid rgba(255,255,255,.14); border-radius:50%; }
+  .mapRing.r1 { inset:32%; }
+  .mapRing.r2 { inset:16%; }
+  .mapRing.r3 { inset:0; }
+  .mapCompassLabel { position:absolute; color:rgba(255,255,255,.5); font-size:10px; font-weight:700; }
+  .mapCompassLabel.n { top:4px; left:50%; transform:translateX(-50%); }
+  .mapCompassLabel.s { bottom:4px; left:50%; transform:translateX(-50%); }
+  .mapCompassLabel.e { right:4px; top:50%; transform:translateY(-50%); }
+  .mapCompassLabel.w { left:4px; top:50%; transform:translateY(-50%); }
+  #mapViewerDot { position:absolute; left:50%; top:50%; width:10px; height:10px; margin:-5px; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.25); }
+  .mapDot { position:absolute; width:14px; height:14px; margin:-7px; border-radius:50%; background:rgba(255,255,255,.3); border:2px solid rgba(255,255,255,.55); transition:background .3s var(--ease-out), border-color .3s var(--ease-out); }
+  .mapDot.found { background:#2ecc71; border-color:#fff; }
+  .mapDot.anchor { width:10px; height:10px; margin:-5px; background:#ff4d4d; border-color:#fff; }
+  #mapLegend { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--kpf-body); }
+  #mapLegend .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+  #mapLegend .dot.found { background:#2ecc71; }
+  #mapLegend .dot.todo { background:rgba(255,255,255,.35); border:1px solid rgba(0,0,0,.2); }
+  #mapLegend .dot.anchor { background:#ff4d4d; }
 </style>
 </head>
 <body>
 
-<div id="version">v5.8 · info card photos, no fill</div>
+<div id="version">v5.9 · skyline map, synced progress</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -220,7 +250,10 @@
   <div id="crosshair"></div>
   <div id="progressBadge"></div>
   <div id="status">Step 1 — move the phone, then point at the Empire State Building and tap Align.</div>
-  <button id="exitBtn">Exit AR</button>
+  <div id="topRightBar">
+    <button id="mapBtn">🗺 Map</button>
+    <button id="exitBtn">Exit AR</button>
+  </div>
 
   <div id="alignGuide">
     <button class="close" id="alignGuideClose">&times;</button>
@@ -262,6 +295,29 @@
       <h2>50 Years, 14 Towers — Found Them All!</h2>
       <p>You've discovered every KPF project visible from Edge. Happy 50th, KPF.</p>
       <button id="completeClose">Nice!</button>
+    </div>
+  </div>
+
+  <div id="mapOverlay">
+    <div id="mapCard">
+      <button class="close" id="mapClose">&times;</button>
+      <h2>Skyline Map</h2>
+      <p class="mapSub">You're at the center — every KPF project is placed by its real bearing &amp; distance from Edge. Find a tower in AR to reveal its pin here.</p>
+      <div id="mapRadar">
+        <div class="mapRing r1"></div>
+        <div class="mapRing r2"></div>
+        <div class="mapRing r3"></div>
+        <div class="mapCompassLabel n">N</div>
+        <div class="mapCompassLabel e">E</div>
+        <div class="mapCompassLabel s">S</div>
+        <div class="mapCompassLabel w">W</div>
+        <div id="mapViewerDot"></div>
+      </div>
+      <div id="mapLegend">
+        <span><span class="dot found"></span>Found</span>
+        <span><span class="dot todo"></span>Not yet</span>
+        <span><span class="dot anchor"></span>Empire State (align here)</span>
+      </div>
     </div>
   </div>
 </div>
@@ -343,6 +399,7 @@ function markDiscovered(b){
   discovered.add(b.name);
   localStorage.setItem(DISCOVERED_KEY, JSON.stringify([...discovered]));
   if (b.labelEl) b.labelEl.classList.add('discovered', 'celebrate');   // 'celebrate' plays the pop/ring once
+  if (b.mapDotEl) { b.mapDotEl.classList.add('found'); b.mapDotEl.title = b.name; }
   updateProgressBadge();
   return true;
 }
@@ -389,6 +446,7 @@ $('#resetProgressBtn').addEventListener('click', () => {
   localStorage.removeItem(COMPLETED_KEY);
   for (const b of BUILDINGS) {
     if (b.labelEl) b.labelEl.classList.remove('discovered');
+    if (b.mapDotEl && !b.anchorOnly) { b.mapDotEl.classList.remove('found'); b.mapDotEl.title = '?'; }
   }
   updateProgressBadge();
   $('#resetProgressBtn').textContent = 'Progress reset ✓';
@@ -516,6 +574,42 @@ $('#infoScrim').addEventListener('click', closeInfoCard);
   card.addEventListener('pointerup', end);
   card.addEventListener('pointercancel', end);
 })();
+
+// ---- Skyline map: a static top-down compass (no map tiles/network dependency), pins placed by
+// each building's real bearing/distance from the anchor. Undiscovered buildings show as a plain
+// dot — the position hints "which way to look" without spoiling the name before it's found in AR.
+const MAP_MAX_DIST = Math.max(...BUILDINGS.filter(b => !b.anchorOnly).map(b => b.dist));
+function mapPos(b) {
+  const rNorm = clamp(Math.pow(b.dist / MAP_MAX_DIST, 0.55), 0.12, 1);
+  const rad = b.bearing * Math.PI / 180;
+  return { x: 50 + Math.sin(rad) * rNorm * 46, y: 50 - Math.cos(rad) * rNorm * 46 };
+}
+function buildMap() {
+  const radar = $('#mapRadar');
+  for (const b of BUILDINGS) {
+    const { x, y } = mapPos(b);
+    const dot = document.createElement('div');
+    dot.className = 'mapDot' + (b.anchorOnly ? ' anchor' : (isDiscovered(b) ? ' found' : ''));
+    dot.style.left = x + '%';
+    dot.style.top = y + '%';
+    dot.title = b.anchorOnly ? b.name : (isDiscovered(b) ? b.name : '?');
+    if (!b.anchorOnly) {
+      dot.addEventListener('pointerdown', e => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
+      dot.addEventListener('click', e => {
+        e.stopPropagation();
+        if (isDiscovered(b)) { closeMap(); showInfo(b); }
+      });
+    }
+    radar.appendChild(dot);
+    b.mapDotEl = dot;
+  }
+}
+function openMap() { if (!$('#mapRadar').querySelector('.mapDot')) buildMap(); $('#mapOverlay').classList.add('show'); }
+function closeMap() { $('#mapOverlay').classList.remove('show'); }
+$('#mapBtn').addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
+$('#mapBtn').addEventListener('click', openMap);
+$('#mapClose').addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
+$('#mapClose').addEventListener('click', closeMap);
 
 // Tapping the AR view: open info for whichever label you're aiming nearest to.
 // Generous ~26° cone so you don't have to aim precisely.
