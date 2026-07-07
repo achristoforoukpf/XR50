@@ -183,12 +183,17 @@
   #mapCard .close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; }
   #mapCard h2 { color:var(--kpf-navy); font-size:20px; font-weight:800; margin-bottom:4px; padding-right:30px; }
   #mapCard .mapSub { color:var(--kpf-body); font-size:12.5px; line-height:1.4; margin-bottom:16px; }
-  #mapRadar { position:relative; width:100%; aspect-ratio:640/880; border-radius:12px; overflow:hidden; background:#0A1E42 center/cover no-repeat; margin:0 auto 14px; border:1px solid rgba(255,255,255,.15); }
-  #mapRadar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+  #mapRadar { position:relative; width:100%; aspect-ratio:640/880; border-radius:12px; overflow:hidden; background:#0A1E42 center/cover no-repeat; margin:0 auto 8px; border:1px solid rgba(255,255,255,.15); touch-action:none; }
+  /* Pinch-zoom/pan is applied as one transform on this layer (image + dots move/scale together as a
+     unit) rather than recomputing every dot's percentage position — simpler and can't drift out of
+     sync with the image underneath it. */
+  #mapZoomLayer { position:absolute; inset:0; transform-origin:center center; will-change:transform; }
+  #mapZoomLayer img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
   #mapViewerDot { position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px; border-radius:50%; background:#4da3ff; border:2px solid #fff; box-shadow:0 0 0 5px rgba(77,163,255,.35), 0 2px 6px rgba(0,0,0,.4); z-index:2; }
   .mapDot { position:absolute; width:14px; height:14px; margin:-7px; border-radius:50%; background:rgba(255,255,255,.55); border:2px solid rgba(10,30,66,.7); box-shadow:0 1px 4px rgba(0,0,0,.35); transition:background .3s var(--ease-out), border-color .3s var(--ease-out); z-index:1; }
   .mapDot.found { background:#2ecc71; border-color:#fff; }
   .mapDot.anchor { width:11px; height:11px; margin:-5.5px; background:#ff4d4d; border-color:#fff; }
+  .mapZoomHint { text-align:center; font-size:10.5px; color:var(--kpf-meta); margin-top:2px; margin-bottom:10px; }
   #mapLegend { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--kpf-body); }
   #mapLegend .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:middle; }
   #mapLegend .dot.found { background:#2ecc71; }
@@ -198,7 +203,7 @@
 </head>
 <body>
 
-<div id="version">v5.21 · pin clustering with tap-to-pick</div>
+<div id="version">v5.22 · pinch-zoom &amp; pan on map</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -330,14 +335,17 @@
       <h2>Skyline Map</h2>
       <p class="mapSub">The blue dot is you, at Edge. Every visible KPF project sits at its true spot on the map. Find a tower in AR to reveal its pin here.</p>
       <div id="mapRadar">
-        <img src="photos/map-bg.png" alt="Map of Manhattan and Brooklyn">
-        <div id="mapViewerDot"></div>
+        <div id="mapZoomLayer">
+          <img src="photos/map-bg.png" alt="Map of Manhattan and Brooklyn">
+          <div id="mapViewerDot"></div>
+        </div>
       </div>
       <div id="mapLegend">
         <span><span class="dot found"></span>Found</span>
         <span><span class="dot todo"></span>Not yet</span>
         <span><span class="dot anchor"></span>Empire State (align here)</span>
       </div>
+      <p class="mapZoomHint">Pinch to zoom, drag to pan</p>
     </div>
   </div>
 </div>
@@ -662,7 +670,7 @@ function mapPos(b) {
   return { x: 50 + ((p.x - MAP_CENTER_PX.x) / 640) * 100, y: 50 + ((p.y - MAP_CENTER_PX.y) / 880) * 100 };
 }
 function buildMap() {
-  const radar = $('#mapRadar');
+  const layer = $('#mapZoomLayer');
   for (const b of BUILDINGS) {
     const { x, y } = mapPos(b);
     const dot = document.createElement('div');
@@ -677,11 +685,72 @@ function buildMap() {
         if (isDiscovered(b)) { closeMap(); showInfo(b); }
       });
     }
-    radar.appendChild(dot);
+    layer.appendChild(dot);
     b.mapDotEl = dot;
   }
 }
-function openMap() { if (!$('#mapRadar').querySelector('.mapDot')) buildMap(); $('#mapOverlay').classList.add('show'); }
+
+// ---- Pinch-to-zoom / drag-to-pan on the map image, via one CSS transform on #mapZoomLayer (image +
+// dots move/scale together, so they can never drift out of sync with each other). Plain pointer
+// events rather than a gesture library — only two states to track: one pointer down = pan, two down
+// = pinch — which covers what a map needs without pulling in a dependency for it.
+let mapScale = 1, mapPanX = 0, mapPanY = 0;
+const MAP_SCALE_MIN = 1, MAP_SCALE_MAX = 4;
+const mapPointers = new Map();   // pointerId -> {x,y} in client coordinates
+let mapPinchStartDist = 0, mapPinchStartScale = 1;
+let mapPanStart = null;   // {x, y, panX, panY} at the start of a single-pointer drag
+function clampMapPan() {
+  // Cap how far the image can pan so its edge can't be dragged past the viewport, using how much
+  // bigger than the frame the zoomed image now is.
+  const rect = $('#mapRadar').getBoundingClientRect();
+  const maxX = (rect.width * (mapScale - 1)) / 2;
+  const maxY = (rect.height * (mapScale - 1)) / 2;
+  mapPanX = clamp(mapPanX, -maxX, maxX);
+  mapPanY = clamp(mapPanY, -maxY, maxY);
+}
+function applyMapTransform() { $('#mapZoomLayer').style.transform = `translate(${mapPanX}px, ${mapPanY}px) scale(${mapScale})`; }
+function resetMapZoom() { mapScale = 1; mapPanX = 0; mapPanY = 0; applyMapTransform(); }
+$('#mapRadar').addEventListener('pointerdown', (e) => {
+  mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (mapPointers.size === 1) {
+    mapPanStart = { x: e.clientX, y: e.clientY, panX: mapPanX, panY: mapPanY };
+  } else if (mapPointers.size === 2) {
+    const pts = [...mapPointers.values()];
+    mapPinchStartDist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) || 1;
+    mapPinchStartScale = mapScale;
+  }
+});
+$('#mapRadar').addEventListener('pointermove', (e) => {
+  if (!mapPointers.has(e.pointerId)) return;
+  mapPointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
+  if (mapPointers.size === 2) {
+    const pts = [...mapPointers.values()];
+    const dist = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
+    mapScale = clamp(mapPinchStartScale * (dist / mapPinchStartDist), MAP_SCALE_MIN, MAP_SCALE_MAX);
+    clampMapPan(); applyMapTransform();
+  } else if (mapPointers.size === 1 && mapPanStart) {
+    mapPanX = mapPanStart.panX + (e.clientX - mapPanStart.x);
+    mapPanY = mapPanStart.panY + (e.clientY - mapPanStart.y);
+    clampMapPan(); applyMapTransform();
+  }
+});
+function mapPointerEnd(e) {
+  mapPointers.delete(e.pointerId);
+  if (mapPointers.size === 1) {
+    const pt = [...mapPointers.values()][0];
+    mapPanStart = { x: pt.x, y: pt.y, panX: mapPanX, panY: mapPanY };
+  } else {
+    mapPanStart = null;
+  }
+}
+$('#mapRadar').addEventListener('pointerup', mapPointerEnd);
+$('#mapRadar').addEventListener('pointercancel', mapPointerEnd);
+
+function openMap() {
+  if (!$('#mapZoomLayer').querySelector('.mapDot')) buildMap();
+  resetMapZoom();
+  $('#mapOverlay').classList.add('show');
+}
 function closeMap() { $('#mapOverlay').classList.remove('show'); }
 $('#mapBtn').addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
 $('#mapBtn').addEventListener('click', openMap);
