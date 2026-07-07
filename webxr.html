@@ -86,6 +86,12 @@
   .arlabel.celebrate .pinCheck { animation: pinCheckPop .5s ease-out; }
   .arlabel .pinRing { position:absolute; inset:-4px; border-radius:50%; border:2px solid #2ecc71; pointer-events:none; opacity:0; }
   .arlabel.celebrate .pinRing { animation: pinRingPulse .7s ease-out; }
+  /* Cluster badge: several pins too close together to stay individually tappable merge into one of
+     these instead of a straight overlapping stack — a distinct gold ring + count bubble signal "tap
+     to pick one" rather than "this is building X". */
+  .arlabel.cluster .pinHead { border-color:#ffd166; }
+  .arlabel.cluster .pinCheck { display:flex; background:#ffb020; }
+  .arlabel.cluster .pinName { width:130px; }
   #progressBadge { position:fixed; top:calc(34px + env(safe-area-inset-top)); left:12px; z-index:13; background:rgba(255,255,255,.92); color:#0A1E42; font-size:11px; font-weight:800; letter-spacing:.04em; padding:6px 10px; border-radius:8px; display:none; }
   @keyframes crosshairBreathe { 0%,100%{opacity:.55; transform:translate(-50%,-50%) scale(1);} 50%{opacity:1; transform:translate(-50%,-50%) scale(1.12);} }
   #crosshair { position:fixed; left:50%; top:50%; transform:translate(-50%,-50%); pointer-events:none; animation:crosshairBreathe 2.6s ease-in-out infinite; }
@@ -138,6 +144,22 @@
   #celebrateBanner { display:none; margin-top:14px; padding:10px 14px; border-radius:10px; background:#eafaf0; color:#1a7a45; font-weight:700; font-size:14px; }
   #celebrateBanner.show { display:block; animation:celebrateIn .4s ease-out; }
 
+  /* Cluster picker — tapping a merged cluster badge opens this instead of an info card directly,
+     since it represents several buildings at once and we don't know which one you meant. */
+  #clusterScrim { position:fixed; inset:0; z-index:11; background:rgba(4,10,24,0); pointer-events:none; transition:background .35s var(--ease-out); }
+  #clusterScrim.open { background:rgba(4,10,24,0.4); pointer-events:auto; }
+  #clusterSheet { position:fixed; left:0; right:0; bottom:0; z-index:12; background:var(--kpf-paper); border-radius:14px 14px 0 0; padding:22px 22px calc(22px + env(safe-area-inset-bottom)); transform:translateY(110%); transition:transform .45s var(--ease-spring); box-shadow:0 -8px 30px rgba(0,0,0,.35); max-height:70vh; overflow-y:auto; }
+  #clusterSheet.open { transform:translateY(0); }
+  #clusterSheet .close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; z-index:1; }
+  #clusterSheet h2 { color:var(--kpf-navy); font-size:20px; font-weight:800; margin-bottom:4px; padding-right:30px; }
+  #clusterSheet .clusterSub { color:var(--kpf-body); font-size:12.5px; line-height:1.4; margin-bottom:14px; }
+  .clusterRow { width:100%; display:flex; align-items:center; gap:12px; padding:10px 4px; background:none; border:none; border-top:1px solid var(--kpf-rule); text-align:left; }
+  .clusterRow:first-child { border-top:none; }
+  .clusterRow .crThumb { flex:0 0 auto; width:48px; height:48px; border-radius:50%; overflow:hidden; background:#e3ded2; display:flex; align-items:center; justify-content:center; }
+  .clusterRow .crThumb img { width:100%; height:100%; object-fit:cover; display:block; }
+  .clusterRow .crName { flex:1; font-size:15px; font-weight:600; color:var(--kpf-navy); }
+  .clusterRow .crCheck { flex:0 0 auto; width:20px; height:20px; border-radius:50%; background:#2ecc71; color:#fff; font-size:12px; font-weight:800; display:flex; align-items:center; justify-content:center; }
+
   /* Big one-time celebration for finding all 14 — a step above the per-pin discovery flourish. */
   #completeOverlay { position:fixed; inset:0; z-index:20; display:none; align-items:center; justify-content:center; background:rgba(4,10,24,0.72); }
   #completeOverlay.show { display:flex; }
@@ -176,7 +198,7 @@
 </head>
 <body>
 
-<div id="version">v5.20 · real per-building pin elevation</div>
+<div id="version">v5.21 · pin clustering with tap-to-pick</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -282,6 +304,14 @@
     <a id="infoLink" href="#" target="_blank" rel="noopener noreferrer">View on KPF.com →</a>
     <div id="celebrateBanner"></div>
     <div class="tag" style="display:none;">FULL WRITE-UP COMING SOON</div>
+  </div>
+
+  <div id="clusterScrim"></div>
+  <div id="clusterSheet">
+    <button class="close" id="clusterClose">&times;</button>
+    <h2>Which one?</h2>
+    <p class="clusterSub">These pins are close together from here — pick one.</p>
+    <div id="clusterList"></div>
   </div>
 
   <div id="completeOverlay">
@@ -523,6 +553,30 @@ function setStatus(t, autoHideMs){
 // ---- Info card ----
 function openInfoCard(){ $('#infoCard').classList.add('open'); $('#infoScrim').classList.add('open'); }
 function closeInfoCard(){ $('#infoCard').classList.remove('open'); $('#infoScrim').classList.remove('open'); }
+
+// ---- Cluster picker: several pins too close together on screen merge into one badge (see render()
+// below); tapping it opens this instead of jumping straight to an info card, since we don't know
+// which building was meant. ----
+function openClusterPicker(members){
+  $('#clusterList').innerHTML = members.map((b, i) => `
+    <button class="clusterRow" data-i="${i}">
+      <span class="crThumb">${b.photo ? `<img src="${b.photo}" alt="${b.name}">` : '📍'}</span>
+      <span class="crName">${b.name}</span>
+      ${isDiscovered(b) ? '<span class="crCheck">✓</span>' : ''}
+    </button>
+  `).join('');
+  $$('#clusterList .clusterRow').forEach((row, i) => {
+    row.addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
+    row.addEventListener('click', () => { closeClusterPicker(); showInfo(members[i]); });
+  });
+  $('#clusterSheet').classList.add('open');
+  $('#clusterScrim').classList.add('open');
+}
+function closeClusterPicker(){ $('#clusterSheet').classList.remove('open'); $('#clusterScrim').classList.remove('open'); }
+$('#clusterClose').addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
+$('#clusterClose').addEventListener('click', closeClusterPicker);
+$('#clusterScrim').addEventListener('pointerdown', () => { ignoreSelectUntil = performance.now() + 500; });
+$('#clusterScrim').addEventListener('click', closeClusterPicker);
 
 function showInfo(b){
   $('#infoName').textContent = b.name;
@@ -951,6 +1005,29 @@ function getArrowEl(key) {
   return arrowPool[key];
 }
 
+function pinInnerHTML(photo, pos, name, checkContent){
+  const photoInner = photo ? `<img class="pinPhoto" src="${photo}" alt="${name}" style="object-position:${pos || 'center'}">` : `<div class="pinPhoto placeholder">📍</div>`;
+  return `<div class="pinHead">${photoInner}</div><div class="pinRing"></div><div class="pinCheck">${checkContent}</div><div class="pinTail"></div><div class="pinName">${name}</div>`;
+}
+
+// Cluster badges: keyed by the sorted set of member names, so the same DOM element (and its smoothed
+// display position in clusterDisp) is reused frame to frame as long as membership doesn't change —
+// same pattern as arrowPool/getArrowEl above, and the same reason: recreating on every frame would
+// lose the CSS opacity/transform transitions and any position smoothing.
+const clusterPool = {};
+const clusterDisp = {};
+function getClusterEl(key) {
+  if (!clusterPool[key]) {
+    const el = document.createElement('div');
+    el.className = 'arlabel cluster';
+    el.addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
+    el.addEventListener('click', (e) => { e.stopPropagation(); if (el._members) openClusterPicker(el._members); });
+    $('#overlay').appendChild(el);
+    clusterPool[key] = el;
+  }
+  return clusterPool[key];
+}
+
 function render() {
   if (!renderer.xr.isPresenting) return;   // belt-and-suspenders: never touch the XR camera outside a live session
   // Capture current camera pose (valid inside the XR frame) for placement + aim tests.
@@ -1046,21 +1123,22 @@ function render() {
       }
     }
 
-    // Collision avoidance for on-screen pins: stack overlapping ones with a fan-out so they read as
-    // a cluster rather than a straight overlapping column (which is what made closing one card
-    // seem to "reveal" another pin underneath it).
-    onList.sort((a, b) => a.y - b.y);
-    const GAP = 112, XNEAR = 170;   // a touch taller than before to clear two-line wrapped names like "Madison Square Park Tower"
-    for (let i = 1; i < onList.length; i++) {
-      let bumps = 0;
-      for (let j = 0; j < i; j++) {
-        if (Math.abs(onList[i].x - onList[j].x) < XNEAR && onList[i].y - onList[j].y < GAP) {
-          onList[i].y = onList[j].y + GAP;
-          bumps++;
-        }
+    // Group on-screen pins close enough to visually overlap into clusters, via union-find so
+    // membership is symmetric/order-independent — a stack that instead re-sorted by y and cascaded
+    // each pin GAP below its nearest earlier neighbor was order-sensitive: a sub-pixel drift near the
+    // threshold could flip which pin "won" the top slot and re-cascade the whole column, which is
+    // what read as pins bouncing even after their underlying tracked position was smoothed.
+    const CLUSTER_DIST = 76;   // a bit more than one 60px pin head — close enough to actually overlap
+    const parent = onList.map((_, i) => i);
+    function find(i) { while (parent[i] !== i) i = parent[i]; return i; }
+    function union(i, j) { const ri = find(i), rj = find(j); if (ri !== rj) parent[ri] = rj; }
+    for (let i = 0; i < onList.length; i++) {
+      for (let j = i + 1; j < onList.length; j++) {
+        if (Math.hypot(onList[i].x - onList[j].x, onList[i].y - onList[j].y) < CLUSTER_DIST) union(i, j);
       }
-      if (bumps) onList[i].x += (bumps % 2 === 0 ? 1 : -1) * 20 * Math.ceil(bumps / 2);
     }
+    const groups = {};
+    onList.forEach((it, i) => { const r = find(i); (groups[r] = groups[r] || []).push(it); });
 
     // One indicator per direction bucket, at the average position of everything in it.
     for (const key of Object.keys(offBuckets)) {
@@ -1077,37 +1155,68 @@ function render() {
       if (!usedArrowKeys.has(key)) arrowPool[key].style.display = 'none';
     }
 
-    for (const it of onList) {
-      const b = it.b;
-      const el = b.labelEl;
-      // The collision pass above can re-sort/re-stack every frame as pins drift by a sub-pixel
-      // amount near its threshold, which used to snap the rendered position straight to the new
-      // stacked slot with no easing — on a cluster of overlapping pins that read as constant
-      // "bouncing" even though the underlying tracked position (b.sx/b.sy) barely moved. Ease
-      // toward the stacked target the same way b.sx/b.sy eases toward the raw tracked position,
-      // so a re-stack glides into place instead of teleporting.
-      if (b.dispX === undefined) { b.dispX = it.x; b.dispY = it.y; }
-      else {
-        const dx = it.x - b.dispX, dy = it.y - b.dispY, dist = Math.hypot(dx, dy);
+    const usedClusterKeys = new Set();
+    for (const group of Object.values(groups)) {
+      if (group.length === 1) {
+        const it = group[0];
+        const b = it.b;
+        const el = b.labelEl;
+        // Ease toward the target the same way b.sx/b.sy eases toward the raw tracked position, so
+        // a pin moving in/out of a cluster (which changes its target) glides rather than teleports.
+        if (b.dispX === undefined) { b.dispX = it.x; b.dispY = it.y; }
+        else {
+          const dx = it.x - b.dispX, dy = it.y - b.dispY, dist = Math.hypot(dx, dy);
+          const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
+          if (dist > 0.01) { b.dispX += (dx / dist) * step; b.dispY += (dy / dist) * step; }
+        }
+        el.style.display = 'block';
+        el.style.left = b.dispX + 'px';
+        el.style.top = b.dispY + 'px';
+        const seenFade = el.classList.contains('discovered') ? 0.55 : 1;   // slight fade once you've opened its card
+        el.style.opacity = (it.op * seenFade).toFixed(3);
+        // Closer buildings render a bit bigger than farther ones — a subtle depth hierarchy instead
+        // of every pin reading as the same size regardless of how far away the actual tower is.
+        const distScale = clamp(1 - (b.dist - DIST_SCALE_NEAR) / (DIST_SCALE_FAR - DIST_SCALE_NEAR), 0, 1) * (1 - MIN_PIN_SCALE) + MIN_PIN_SCALE;
+        const focus = b._focus || 0;
+        const finalScale = distScale * (1 + focus * 0.1);   // whichever pin you're aiming at grows slightly
+        el.style.transform = `translate(-50%,-100%) scale(${finalScale.toFixed(3)})`;   // pin tip anchors the point, not its center; CSS eases the pop-in from the 0.85 default
+        if (b.pinHeadEl) {
+          b.pinHeadEl.style.boxShadow = focus > 0.08
+            ? `0 0 ${(10 + 26 * focus).toFixed(0)}px rgba(255,255,255,${(0.25 + 0.45 * focus).toFixed(2)})`
+            : 'none';
+        }
+      } else {
+        // Too many pins to keep individually tappable here — merge into one badge with a count
+        // instead of a cramped overlapping stack; tapping it opens a picker to disambiguate.
+        for (const it of group) it.b.labelEl.style.display = 'none';
+        group.sort((a, b) => a.b.dist - b.b.dist);   // closest first — its photo leads the badge
+        const key = group.map(it => it.b.name).sort().join('|');
+        usedClusterKeys.add(key);
+        const el = getClusterEl(key);
+        el._members = group.map(it => it.b);
+        const lead = group[0].b;
+        if (el.dataset.lead !== lead.name) {
+          el.dataset.lead = lead.name;
+          const label = group.length === 2 ? group.map(it => it.b.name).join(' & ') : `${group.length} buildings here`;
+          el.innerHTML = pinInnerHTML(lead.photo, lead.pos, label, String(group.length));
+        }
+        const avgX = group.reduce((s, it) => s + it.x, 0) / group.length;
+        const avgY = group.reduce((s, it) => s + it.y, 0) / group.length;
+        if (!clusterDisp[key]) clusterDisp[key] = { x: avgX, y: avgY };
+        const disp = clusterDisp[key];
+        const dx = avgX - disp.x, dy = avgY - disp.y, dist = Math.hypot(dx, dy);
         const step = Math.min(dist * POS_SMOOTH, MAX_STEP_PX);
-        if (dist > 0.01) { b.dispX += (dx / dist) * step; b.dispY += (dy / dist) * step; }
+        if (dist > 0.01) { disp.x += (dx / dist) * step; disp.y += (dy / dist) * step; }
+        const maxOp = Math.max(...group.map(it => it.op));
+        el.style.display = 'block';
+        el.style.left = disp.x + 'px';
+        el.style.top = disp.y + 'px';
+        el.style.opacity = maxOp.toFixed(3);
+        el.style.transform = 'translate(-50%,-100%) scale(1)';
       }
-      el.style.display = 'block';
-      el.style.left = b.dispX + 'px';
-      el.style.top = b.dispY + 'px';
-      const seenFade = el.classList.contains('discovered') ? 0.55 : 1;   // slight fade once you've opened its card
-      el.style.opacity = (it.op * seenFade).toFixed(3);
-      // Closer buildings render a bit bigger than farther ones — a subtle depth hierarchy instead
-      // of every pin reading as the same size regardless of how far away the actual tower is.
-      const distScale = clamp(1 - (it.b.dist - DIST_SCALE_NEAR) / (DIST_SCALE_FAR - DIST_SCALE_NEAR), 0, 1) * (1 - MIN_PIN_SCALE) + MIN_PIN_SCALE;
-      const focus = it.b._focus || 0;
-      const finalScale = distScale * (1 + focus * 0.1);   // whichever pin you're aiming at grows slightly
-      el.style.transform = `translate(-50%,-100%) scale(${finalScale.toFixed(3)})`;   // pin tip anchors the point, not its center; CSS eases the pop-in from the 0.85 default
-      if (it.b.pinHeadEl) {
-        it.b.pinHeadEl.style.boxShadow = focus > 0.08
-          ? `0 0 ${(10 + 26 * focus).toFixed(0)}px rgba(255,255,255,${(0.25 + 0.45 * focus).toFixed(2)})`
-          : 'none';
-      }
+    }
+    for (const key of Object.keys(clusterPool)) {
+      if (!usedClusterKeys.has(key)) clusterPool[key].style.display = 'none';
     }
   }
   renderer.render(scene, camera);
