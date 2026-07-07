@@ -194,7 +194,7 @@
 </head>
 <body>
 
-<div id="version">v5.25 · cluster break-out animates into place</div>
+<div id="version">v5.26 · cluster break-out stacks vertically</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -1248,7 +1248,7 @@ function render() {
     }
 
     const usedClusterKeys = new Set();
-    const FAN_GAP = 66;   // px between fanned-out members — a touch more than one 60px pin head
+    const FAN_GAP = 76;   // px between fanned-out members — a touch more than one 60px pin head
     for (const group of Object.values(groups)) {
       if (group.length === 1) {
         renderPinAt(group[0], group[0].x, group[0].y);
@@ -1257,17 +1257,20 @@ function render() {
       const key = group.map(it => it.b.name).sort().join('|');
       const expiry = expandedClusters.get(key);
       if (expiry && performance.now() < expiry) {
-        // Broken out by an earlier tap — show each member as its own pin, spread in a row around the
-        // cluster's average position instead of a merged badge. A member that's never rendered as a
-        // single pin before has no b.dispX yet, so it'd otherwise pop straight into its fan slot with
-        // no motion — seed it at the badge's last position first so it visibly flies out from there,
-        // same as every other pin move in this app easing rather than snapping.
+        // Broken out by an earlier tap — show each member as its own pin, stacked in a column around
+        // the cluster's average position instead of a merged badge. Buildings that clustered in the
+        // first place are usually close in bearing but at different distances, so a vertical stack
+        // reads more like their real relationship than an arbitrary left-right spread would.
+        // Ordered by real distance (a fixed value, same as the merged badge's "closest leads" order)
+        // rather than by live tracked position — sorting by a per-frame value here is exactly what
+        // caused the original stacking bug: two members' tracked y drifting across each other by a
+        // sub-pixel amount would flip their sort order and re-cascade the whole column every frame.
         group.sort((a, b) => a.b.dist - b.b.dist);
         const avgX = group.reduce((s, it) => s + it.x, 0) / group.length;
         const avgY = group.reduce((s, it) => s + it.y, 0) / group.length;
         const origin = clusterDisp[key] || { x: avgX, y: avgY };
         for (const it of group) { if (it.b.dispX === undefined) { it.b.dispX = origin.x; it.b.dispY = origin.y; } }
-        group.forEach((it, i) => renderPinAt(it, avgX + (i - (group.length - 1) / 2) * FAN_GAP, avgY));
+        group.forEach((it, i) => renderPinAt(it, avgX, avgY + (i - (group.length - 1) / 2) * FAN_GAP));
         continue;
       }
       if (expiry) expandedClusters.delete(key);   // expired — fall through to a merged badge again
