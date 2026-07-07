@@ -194,7 +194,7 @@
 </head>
 <body>
 
-<div id="version">v5.28 · force KPF.com link to escape into Safari on iOS</div>
+<div id="version">v5.29 · KPF.com link disabled (App Clip can't escape)</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -578,9 +578,12 @@ function showInfo(b){
   // Only flag it as pending when it genuinely is — most cards now have real photos/descriptions,
   // so a blanket "placeholder demo data" tag on every card was no longer accurate.
   $('#infoCard .tag').style.display = (b.info.desc === 'Description pending.') ? 'inline-block' : 'none';
-  const link = $('#infoLink');
-  if (b.kpfUrl) { link.href = toSafariUrl(b.kpfUrl); link.classList.add('show'); }
-  else { link.removeAttribute('href'); link.classList.remove('show'); }
+  // Disabled on-site: neither a plain link nor the x-safari-https escape hatch actually get out of
+  // Variant Launch's App Clip webview to Safari — the latter instead triggered some kind of reload
+  // back to a broken gate render. Rather than keep experimenting live during the event, the link is
+  // just off for now. b.kpfUrl / toSafariUrl are left in place in case Variant Launch's webview
+  // config changes or we find a working escape hatch later.
+  $('#infoLink').classList.remove('show');
   openInfoCard();
   const isNew = markDiscovered(b);
   const banner = $('#celebrateBanner');
