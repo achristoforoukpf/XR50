@@ -149,29 +149,22 @@
   @keyframes confettiFall { 0%{transform:translateY(-10vh) rotate(0deg); opacity:1;} 100%{transform:translateY(110vh) rotate(540deg); opacity:.9;} }
   .confetti { position:absolute; top:0; width:8px; height:14px; opacity:0; animation-name:confettiFall; animation-timing-function:cubic-bezier(0.4,0.1,0.6,0.9); animation-fill-mode:forwards; }
 
-  /* Skyline map — a static top-down compass, not a real map tile (no network dependency). Pins sit
-     at each building's real bearing/distance from the anchor; undiscovered ones stay unlabeled so
-     the AR "find it yourself" reveal isn't spoiled, but the direction hint still syncs with progress. */
+  /* Skyline map — a real static map image (bundled locally, no live tile fetch at the venue), with
+     pins placed by real Web Mercator projection matching the image's known center/zoom. Undiscovered
+     buildings stay unlabeled so the AR "find it yourself" reveal isn't spoiled, but the position hint
+     still syncs live with progress. */
   #mapOverlay { position:fixed; inset:0; z-index:16; display:none; align-items:center; justify-content:center; background:rgba(4,10,24,0.78); }
   #mapOverlay.show { display:flex; }
   #mapCard { position:relative; width:min(88vw,340px); max-height:88vh; overflow-y:auto; background:var(--kpf-paper); border-radius:18px; padding:22px 20px calc(20px + env(safe-area-inset-bottom)); box-shadow:0 20px 60px rgba(0,0,0,.5); animation:celebrateIn .4s var(--ease-spring); }
   #mapCard .close { position:absolute; top:6px; right:6px; width:44px; height:44px; display:flex; align-items:center; justify-content:center; background:none; border:none; color:var(--kpf-navy); font-size:24px; opacity:.5; }
   #mapCard h2 { color:var(--kpf-navy); font-size:20px; font-weight:800; margin-bottom:4px; padding-right:30px; }
   #mapCard .mapSub { color:var(--kpf-body); font-size:12.5px; line-height:1.4; margin-bottom:16px; }
-  #mapRadar { position:relative; width:100%; aspect-ratio:1/1; border-radius:50%; background:radial-gradient(circle,#12325a 0%,#0A1E42 70%,#071228 100%); margin:0 auto 14px; border:1px solid rgba(255,255,255,.15); }
-  .mapRing { position:absolute; border:1px solid rgba(255,255,255,.14); border-radius:50%; }
-  .mapRing.r1 { inset:32%; }
-  .mapRing.r2 { inset:16%; }
-  .mapRing.r3 { inset:0; }
-  .mapCompassLabel { position:absolute; color:rgba(255,255,255,.5); font-size:10px; font-weight:700; }
-  .mapCompassLabel.n { top:4px; left:50%; transform:translateX(-50%); }
-  .mapCompassLabel.s { bottom:4px; left:50%; transform:translateX(-50%); }
-  .mapCompassLabel.e { right:4px; top:50%; transform:translateY(-50%); }
-  .mapCompassLabel.w { left:4px; top:50%; transform:translateY(-50%); }
-  #mapViewerDot { position:absolute; left:50%; top:50%; width:10px; height:10px; margin:-5px; border-radius:50%; background:#fff; box-shadow:0 0 0 4px rgba(255,255,255,.25); }
-  .mapDot { position:absolute; width:14px; height:14px; margin:-7px; border-radius:50%; background:rgba(255,255,255,.3); border:2px solid rgba(255,255,255,.55); transition:background .3s var(--ease-out), border-color .3s var(--ease-out); }
+  #mapRadar { position:relative; width:100%; aspect-ratio:640/880; border-radius:12px; overflow:hidden; background:#0A1E42 center/cover no-repeat; margin:0 auto 14px; border:1px solid rgba(255,255,255,.15); }
+  #mapRadar img { position:absolute; inset:0; width:100%; height:100%; object-fit:cover; display:block; }
+  #mapViewerDot { position:absolute; left:50%; top:50%; width:14px; height:14px; margin:-7px; border-radius:50%; background:#4da3ff; border:2px solid #fff; box-shadow:0 0 0 5px rgba(77,163,255,.35), 0 2px 6px rgba(0,0,0,.4); z-index:2; }
+  .mapDot { position:absolute; width:14px; height:14px; margin:-7px; border-radius:50%; background:rgba(255,255,255,.55); border:2px solid rgba(10,30,66,.7); box-shadow:0 1px 4px rgba(0,0,0,.35); transition:background .3s var(--ease-out), border-color .3s var(--ease-out); z-index:1; }
   .mapDot.found { background:#2ecc71; border-color:#fff; }
-  .mapDot.anchor { width:10px; height:10px; margin:-5px; background:#ff4d4d; border-color:#fff; }
+  .mapDot.anchor { width:11px; height:11px; margin:-5.5px; background:#ff4d4d; border-color:#fff; }
   #mapLegend { display:flex; align-items:center; gap:12px; flex-wrap:wrap; font-size:11px; color:var(--kpf-body); }
   #mapLegend .dot { display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:4px; vertical-align:middle; }
   #mapLegend .dot.found { background:#2ecc71; }
@@ -181,7 +174,7 @@
 </head>
 <body>
 
-<div id="version">v5.10 · renamed KPF50 Skyline Viewer</div>
+<div id="version">v5.11 · real map background, new cover photo</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -302,15 +295,9 @@
     <div id="mapCard">
       <button class="close" id="mapClose">&times;</button>
       <h2>Skyline Map</h2>
-      <p class="mapSub">You're at the center — every KPF project is placed by its real bearing &amp; distance from Edge. Find a tower in AR to reveal its pin here.</p>
+      <p class="mapSub">The blue dot is you, at Edge. Every KPF project sits at its true spot on the map. Find a tower in AR to reveal its pin here.</p>
       <div id="mapRadar">
-        <div class="mapRing r1"></div>
-        <div class="mapRing r2"></div>
-        <div class="mapRing r3"></div>
-        <div class="mapCompassLabel n">N</div>
-        <div class="mapCompassLabel e">E</div>
-        <div class="mapCompassLabel s">S</div>
-        <div class="mapCompassLabel w">W</div>
+        <img src="photos/map-bg.png" alt="Map of Manhattan and Brooklyn">
         <div id="mapViewerDot"></div>
       </div>
       <div id="mapLegend">
@@ -575,14 +562,23 @@ $('#infoScrim').addEventListener('click', closeInfoCard);
   card.addEventListener('pointercancel', end);
 })();
 
-// ---- Skyline map: a static top-down compass (no map tiles/network dependency), pins placed by
-// each building's real bearing/distance from the anchor. Undiscovered buildings show as a plain
-// dot — the position hints "which way to look" without spoiling the name before it's found in AR.
-const MAP_MAX_DIST = Math.max(...BUILDINGS.filter(b => !b.anchorOnly).map(b => b.dist));
+// ---- Skyline map: a real static map image (photos/map-bg.png), bundled locally rather than fetched
+// live from Mapbox at the venue. Pins use the same Web Mercator projection Mapbox used to render that
+// image, so they land on their true real-world spot — no network call needed at runtime.
+// Generated via: https://api.mapbox.com/styles/v1/mapbox/streets-v12/static/{lon},{lat},{zoom},0,0/{w}x{h}@2x
+const MAP_CENTER = { lon: -74.00076274465533, lat: 40.75393935378195 };
+const MAP_ZOOM = 11.6;
+function mercatorPx(lon, lat, zoom) {
+  const scale = 512 * Math.pow(2, zoom);
+  const x = scale * (lon + 180) / 360;
+  const latRad = lat * Math.PI / 180;
+  const y = scale * (0.5 - Math.log(Math.tan(Math.PI / 4 + latRad / 2)) / (2 * Math.PI));
+  return { x, y };
+}
+const MAP_CENTER_PX = mercatorPx(MAP_CENTER.lon, MAP_CENTER.lat, MAP_ZOOM);
 function mapPos(b) {
-  const rNorm = clamp(Math.pow(b.dist / MAP_MAX_DIST, 0.55), 0.12, 1);
-  const rad = b.bearing * Math.PI / 180;
-  return { x: 50 + Math.sin(rad) * rNorm * 46, y: 50 - Math.cos(rad) * rNorm * 46 };
+  const p = mercatorPx(b.lon, b.lat, MAP_ZOOM);
+  return { x: 50 + ((p.x - MAP_CENTER_PX.x) / 640) * 100, y: 50 + ((p.y - MAP_CENTER_PX.y) / 880) * 100 };
 }
 function buildMap() {
   const radar = $('#mapRadar');
