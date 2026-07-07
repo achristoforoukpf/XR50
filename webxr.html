@@ -194,7 +194,7 @@
 </head>
 <body>
 
-<div id="version">v5.26 · cluster break-out stacks vertically</div>
+<div id="version">v5.27 · KPF.com link opens in Safari, not a dead-end</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -297,7 +297,7 @@
     <h2 id="infoName">—</h2>
     <dl class="fields" id="infoFields"></dl>
     <div class="desc" id="infoDesc"></div>
-    <a id="infoLink" href="#" target="_blank" rel="noopener noreferrer">View on KPF.com →</a>
+    <a id="infoLink" href="#" rel="noreferrer">View on KPF.com →</a>
     <div id="celebrateBanner"></div>
     <div class="tag" style="display:none;">FULL WRITE-UP COMING SOON</div>
   </div>
@@ -592,10 +592,11 @@ $('#infoClose').addEventListener('pointerdown', (e) => { e.stopPropagation(); ig
 $('#infoClose').addEventListener('click', closeInfoCard);
 // Same swipe-capture guard as the × button above — otherwise tapping the link can get swallowed as a drag.
 $('#infoLink').addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
-// Opening an external link from inside a live AR session is unreliable across browsers/bridges —
-// end the session proactively here instead of hoping it tears down cleanly on its own once the new
-// tab steals focus. The link still opens in its own tab (target="_blank"); this just guarantees this
-// tab is already back at the gate, tappable, whenever the guest returns to it.
+// No target="_blank" — inside Variant Launch's iOS App Clip webview, opening a new tab landed in a
+// constrained in-app browser sheet with no back button, stranding guests on kpf.com with no way
+// back. A plain top-level navigation instead gets handed off to Safari/the system browser normally.
+// End the session proactively before navigating away, same reasoning as before: don't rely on it
+// tearing down cleanly on its own once the page unloads.
 $('#infoLink').addEventListener('click', () => { closeInfoCard(); if (xrSession) xrSession.end(); });
 // Tap the dimmed backdrop to dismiss too, same as tapping ×.
 $('#infoScrim').addEventListener('pointerdown', () => { ignoreSelectUntil = performance.now() + 500; });
@@ -913,10 +914,9 @@ function withTimeout(promise, ms, message){
 
 // Shared teardown for a live AR session — used both by the session's own 'end' event and by the
 // visibilitychange safety net below, since some browsers/bridges (e.g. Variant Launch on iOS) don't
-// reliably fire 'end' after the tab is backgrounded by an external navigation (like tapping a
-// target="_blank" link on an info card) and returning — without this, Enter AR looked "blocked"
-// until a manual refresh, because the gate/overlay state never got reset even though the underlying
-// session was already gone.
+// reliably fire 'end' after the tab is backgrounded (e.g. app-switching away and back) — without
+// this, Enter AR looked "blocked" until a manual refresh, because the gate/overlay state never got
+// reset even though the underlying session was already gone.
 function onSessionEnded(onResize) {
   try { screen.orientation?.unlock?.(); } catch (_) {}   // let the gate screen rotate freely again
   if (renderer) renderer.setAnimationLoop(null);   // stop the render loop — otherwise it keeps calling
