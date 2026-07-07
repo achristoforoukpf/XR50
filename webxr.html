@@ -176,7 +176,7 @@
 </head>
 <body>
 
-<div id="version">v5.16 · align buttons moved up more</div>
+<div id="version">v5.17 · fix stuck Enter AR after KPF.com link</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -541,6 +541,11 @@ $('#infoClose').addEventListener('pointerdown', (e) => { e.stopPropagation(); ig
 $('#infoClose').addEventListener('click', closeInfoCard);
 // Same swipe-capture guard as the × button above — otherwise tapping the link can get swallowed as a drag.
 $('#infoLink').addEventListener('pointerdown', (e) => { e.stopPropagation(); ignoreSelectUntil = performance.now() + 500; });
+// Opening an external link from inside a live AR session is unreliable across browsers/bridges —
+// end the session proactively here instead of hoping it tears down cleanly on its own once the new
+// tab steals focus. The link still opens in its own tab (target="_blank"); this just guarantees this
+// tab is already back at the gate, tappable, whenever the guest returns to it.
+$('#infoLink').addEventListener('click', () => { closeInfoCard(); if (xrSession) xrSession.end(); });
 // Tap the dimmed backdrop to dismiss too, same as tapping ×.
 $('#infoScrim').addEventListener('pointerdown', () => { ignoreSelectUntil = performance.now() + 500; });
 $('#infoScrim').addEventListener('click', closeInfoCard);
@@ -781,6 +786,47 @@ function withTimeout(promise, ms, message){
   ]);
 }
 
+// Shared teardown for a live AR session — used both by the session's own 'end' event and by the
+// visibilitychange safety net below, since some browsers/bridges (e.g. Variant Launch on iOS) don't
+// reliably fire 'end' after the tab is backgrounded by an external navigation (like tapping a
+// target="_blank" link on an info card) and returning — without this, Enter AR looked "blocked"
+// until a manual refresh, because the gate/overlay state never got reset even though the underlying
+// session was already gone.
+function onSessionEnded(onResize) {
+  try { screen.orientation?.unlock?.(); } catch (_) {}   // let the gate screen rotate freely again
+  if (renderer) renderer.setAnimationLoop(null);   // stop the render loop — otherwise it keeps calling
+                                                    // render() via a plain rAF after the session ends,
+                                                    // hammering renderer.xr.getCamera() with no active
+                                                    // XR frame and spamming errors that choke the gate's UI.
+  if (onResize) {
+    window.removeEventListener('resize', onResize);
+    window.removeEventListener('orientationchange', onResize);
+  }
+  xrSession = null;
+  aligned = false;
+  $('#overlay').style.display = 'none';
+  $('#gate').style.display = 'flex';
+  $('#enterBtn').textContent = 'Enter AR';
+  if (renderer) {
+    if (renderer.domElement && renderer.domElement.parentNode) renderer.domElement.remove();
+    renderer.dispose();   // release the WebGL context — mobile browsers cap how many can be live at
+                           // once, and without this, re-entering AR after Exit AR could fail because
+                           // the previous session's context was still allocated in the background.
+  }
+  renderer = null;
+  scene = null;
+  camera = null;
+  closeInfoCard();   // in case an info card was left open when the session went away
+}
+// Safety net: if the tab regains visibility while we still think a session is live, but Three's XR
+// manager no longer agrees, the session died silently — force the same cleanup instead of leaving
+// the UI stuck until a manual refresh.
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible' && xrSession && renderer && !renderer.xr.isPresenting) {
+    onSessionEnded(null);
+  }
+});
+
 async function enterAR() {
   $('#enterBtn').textContent = 'Starting…';
   const reassureTimer = setTimeout(() => {
@@ -837,27 +883,7 @@ async function enterAR() {
     controller.addEventListener('select', onSelect);
     scene.add(controller);
 
-    xrSession.addEventListener('end', () => {
-      try { screen.orientation?.unlock?.(); } catch (_) {}   // let the gate screen rotate freely again
-      renderer.setAnimationLoop(null);   // stop the render loop — otherwise it keeps calling render()
-                                          // via a plain rAF after the session ends, hammering
-                                          // renderer.xr.getCamera() with no active XR frame and
-                                          // spamming errors that were choking the gate's own UI.
-      window.removeEventListener('resize', onResize);
-      window.removeEventListener('orientationchange', onResize);
-      xrSession = null;
-      aligned = false;
-      $('#overlay').style.display = 'none';
-      $('#gate').style.display = 'flex';
-      $('#enterBtn').textContent = 'Enter AR';
-      if (renderer.domElement.parentNode) renderer.domElement.remove();
-      renderer.dispose();   // release the WebGL context — mobile browsers cap how many can be live at
-                             // once, and without this, re-entering AR after Exit AR could fail because
-                             // the previous session's context was still allocated in the background.
-      renderer = null;
-      scene = null;
-      camera = null;
-    });
+    xrSession.addEventListener('end', () => onSessionEnded(onResize));
 
     $('#exitBtn').onclick = () => xrSession.end();
 
