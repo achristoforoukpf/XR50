@@ -193,7 +193,7 @@
 </head>
 <body>
 
-<div id="version">v5.32</div>
+<div id="version">v5.33</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -271,7 +271,7 @@
     <ol id="guideSteps">
       <li><span class="n">1</span>Align on ESB</li>
       <li><span class="n">2</span>Scan the skyline</li>
-      <li><span class="n">3</span>Tap pins — collect all 15!</li>
+      <li><span class="n">3</span>Tap pins — collect all 13!</li>
     </ol>
     <svg id="alignGuideDiagram" viewBox="0 0 120 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect x="12" y="120" width="96" height="42" fill="#3a4f74"/>
@@ -304,7 +304,7 @@
     <div id="confettiLayer"></div>
     <div id="completeCard">
       <div id="completeTrophy">🏆</div>
-      <h2>50 Years, 15 Towers — Found Them All!</h2>
+      <h2>50 Years, 13 Towers — Found Them All!</h2>
       <p>You've discovered every KPF project visible from Edge. Happy 50th, KPF.</p>
       <button id="completeClose">Nice!</button>
     </div>
@@ -376,12 +376,8 @@ const BUILDINGS = [
     info:edgeInfo("Located on Manhattan's most prestigious business and retail thoroughfare and designed with principles of sustainability, health, wellness, and connectivity, 520 Fifth Avenue is an 88-story vertical village that represents a new concept in luxury residential and boutique office space.", "2025", "Rabina Properties, LLC") },
   { name:"2 Waterline Square", lat:40.7734, lon:-73.9912, photo:"photos/2-waterline-square.jpg", kpfUrl:"https://www.kpf.com/project/2-waterline-square", hM:138,
     info:edgeInfo("Through creative planning and massing adjustments within the strict confines of a previously approved scheme, KPF achieved the client's brief, weaving together 645 mixed-income units with plentiful outdoor space and amenities.", "2019", "GID Development Group") },
-  { name:"55 Hudson Yards", lat:40.7556, lon:-74.0027, photo:"photos/55-hudson-yards.jpg", kpfUrl:"https://www.kpf.com/project/55-hudson-yards", hM:238,
-    info:edgeInfo("55 Hudson Yards synthesizes the contemporary, sleek forms of Manhattan's new mega-development with the industrial roots of its neighboring Meatpacking District.", "2019", "The Related Companies") },
-  { name:"10 Hudson Yards", lat:40.7541, lon:-74.0019, photo:"photos/10-hudson-yards.jpg", kpfUrl:"https://www.kpf.com/project/10-30-hudson-yards", hM:268,   // CSV note: double check these coordinates
-    info:edgeInfo("", "2017", "The Related Companies") },
-  { name:"20 Hudson Yards", lat:40.7534, lon:-74.0027, photo:"photos/20-hudson-yards.jpg", pos:"32% 55%", kpfUrl:"https://www.kpf.com/project/20-hudson-yards", hM:69,
-    info:edgeInfo("Situated between 10 and 30 Hudson Yards, 20 Hudson Yards is home to Wells Fargo and The Shops and Restaurants at Hudson Yards, one of New York City's premiere locations for fashion and dining, elevating the standard for shopping in a dynamic, mixed-used setting.", "2019", "The Related Companies") },
+  { name:"Hudson Yards", lat:40.7533, lon:-74.0007, photo:"photos/hudson-yards.jpg",   // consolidated: was 10/20/55 Hudson Yards as separate pins — too many to keep distinct at close range
+    info:edgeInfo("One of the most complex construction projects ever built in New York City, Hudson Yards transforms a vast desolate space into a vibrant, mixed-use neighborhood. KPF's work at Hudson Yards includes the design of 10 & 30 Hudson Yards, 20 Hudson Yards, 55 Hudson Yards, and the platform on which the whole neighborhood rests.", "2019", "The Related Companies") },
   { name:"One Madison Avenue", lat:40.7412, lon:-73.9869, photo:"photos/one-madison-avenue.jpg", pos:"88% 48%", kpfUrl:"https://www.kpf.com/project/one-madison-avenue", hM:143,
     info:edgeInfo("With a design complementing its landmarked neighbor, the transformation of One Madison Avenue brings flexible, Class-A office space to Manhattan's Flatiron District.", "2024", "SL Green Realty Corp., Hines") },
   { name:"Madison Square Park Tower", lat:40.7398, lon:-73.9874, photo:"photos/madison-square-park-tower.jpg", pos:"60% 42%", kpfUrl:"https://www.kpf.com/project/45-east-22nd-street", hM:237,
@@ -539,7 +535,7 @@ function alignOn(ref) {
   setStatus(`Aligned on ${ref.name}! 🎯`, 2200);   // brief confirmation, then hand off to the Step 2 prompt below
   clearTimeout(stepTwoTimer);
   stepTwoTimer = setTimeout(() => {
-    setStatus('Step 2 — scan the skyline and tap any pin for project info. Can you find all 15 KPF projects?', 7500);
+    setStatus('Step 2 — scan the skyline and tap any pin for project info. Can you find all 13 KPF projects?', 7500);
   }, 2600);
   $('#placeBtns').classList.add('collapsed');                             // tuck the align buttons into a Re-align chip
   hideAlignGuide();
