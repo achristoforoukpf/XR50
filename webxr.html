@@ -193,7 +193,7 @@
 </head>
 <body>
 
-<div id="version">v5.31</div>
+<div id="version">v5.32</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -244,7 +244,7 @@
 
   <ol id="howto">
     <li><span class="n">1</span><span>Tap <b>Enter AR</b> and allow camera access.</span></li>
-    <li><span class="n">2</span><span>Move the phone a moment, aim at the Empire State Building, and tap <b>Align</b>.</span></li>
+    <li><span class="n">2</span><span>Aim at the Empire State Building and tap <b>Align</b>.</span></li>
     <li><span class="n">3</span><span>Pan the skyline — tap any pin for project details.</span></li>
   </ol>
 
@@ -260,7 +260,7 @@
 <div id="overlay">
   <div id="crosshair"></div>
   <div id="progressBadge"></div>
-  <div id="status">Step 1 — move the phone, then point at the Empire State Building and tap Align.</div>
+  <div id="status">Step 1 — point at the Empire State Building and tap Align.</div>
   <div id="topRightBar">
     <button id="mapBtn">🗺 Map</button>
     <button id="exitBtn">Exit AR</button>
@@ -517,7 +517,7 @@ const DIST_SCALE_NEAR = 400, DIST_SCALE_FAR = 3800;   // meters — pins at/unde
 const MIN_PIN_SCALE = 0.62;
 
 function alignOn(ref) {
-  if (camForward.lengthSq() === 0) { setStatus('Tracking not ready — move the phone a moment.'); return; }
+  if (camForward.lengthSq() === 0) { setStatus('Tracking not ready — move the phone around for a moment.'); return; }
   const refYaw = Math.atan2(camForward.x, -camForward.z);   // session yaw the user is aiming at
   alignYaw = refYaw;
 
