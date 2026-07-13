@@ -193,7 +193,7 @@
 </head>
 <body>
 
-<div id="version">v5.30</div>
+<div id="version">v5.31</div>
 
 <div id="gate">
   <div id="coverPhoto"></div>
@@ -271,7 +271,7 @@
     <ol id="guideSteps">
       <li><span class="n">1</span>Align on ESB</li>
       <li><span class="n">2</span>Scan the skyline</li>
-      <li><span class="n">3</span>Tap pins — collect all 14!</li>
+      <li><span class="n">3</span>Tap pins — collect all 15!</li>
     </ol>
     <svg id="alignGuideDiagram" viewBox="0 0 120 170" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
       <rect x="12" y="120" width="96" height="42" fill="#3a4f74"/>
@@ -304,7 +304,7 @@
     <div id="confettiLayer"></div>
     <div id="completeCard">
       <div id="completeTrophy">🏆</div>
-      <h2>50 Years, 14 Towers — Found Them All!</h2>
+      <h2>50 Years, 15 Towers — Found Them All!</h2>
       <p>You've discovered every KPF project visible from Edge. Happy 50th, KPF.</p>
       <button id="completeClose">Nice!</button>
     </div>
@@ -396,6 +396,8 @@ const BUILDINGS = [
     info:edgeInfo("", "1989", "American Express; Shearson Lehman Brothers") },
   { name:"Hudson Commons", lat:40.7539, lon:-73.9965, photo:"photos/hudson-commons.jpg", kpfUrl:"https://www.kpf.com/project/hudson-commons", hM:142,
     info:edgeInfo("Situated at the gateway to the Hudson Yards submarket, this repositioned, LEED Platinum office tower maintains the expression of the site and neighborhood while attracting creative tenants to its new Class-A workspace.", "2019", "COVE Property Group LLC") },
+  { name:"The William and Anita Newman Vertical Campus, Baruch College", lat:40.7408, lon:-73.9839, photo:"photos/newman-vertical-campus.jpg",   // no height/KPF.com page provided
+    info:edgeInfo("Occupying almost a full city block in Manhattan's historic Gramercy Park neighborhood, the 14-story William and Anita Newman Vertical Campus at Baruch College features a tiered glass-enclosed atrium that allows natural daylight into public spaces and subterranean levels.", "2001", "City University of New York") },
 ];
 // Edge's observation deck sits ~345m above sea level (1,131ft deck height + ~10m street elevation);
 // most of these projects are far shorter than that, so from here you're actually looking DOWN at
@@ -537,7 +539,7 @@ function alignOn(ref) {
   setStatus(`Aligned on ${ref.name}! 🎯`, 2200);   // brief confirmation, then hand off to the Step 2 prompt below
   clearTimeout(stepTwoTimer);
   stepTwoTimer = setTimeout(() => {
-    setStatus('Step 2 — scan the skyline and tap any pin for project info. Can you find all 14 KPF projects?', 7500);
+    setStatus('Step 2 — scan the skyline and tap any pin for project info. Can you find all 15 KPF projects?', 7500);
   }, 2600);
   $('#placeBtns').classList.add('collapsed');                             // tuck the align buttons into a Re-align chip
   hideAlignGuide();
